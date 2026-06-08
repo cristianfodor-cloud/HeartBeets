@@ -1,0 +1,42 @@
+# Standard Android / Gradle artefacts
+*.iml
+.gradle/
+.idea/
+.DS_Store
+build/
+app/build/
+captures/
+.externalNativeBuild/
+.cxx/
+local.properties
+
+# Build outputs
+*.apk
+*.aab
+*.ap_
+
+# Credentials / secrets — never commit
+google-services.json
+app/google-services.json
+*.jks
+*.keystore
+keystore.properties
+.env
+.env.*
+
+# Kotlin / native incremental caches
+**/*.kotlin_module
+
+# Logs and scratch files
+*.log
+build_log.txt
+build_output*.txt
+
+# OS junk
+Thumbs.db
+ehthumbs.db
+desktop.ini
+
+# Editor
+.vscode/
+*.swp

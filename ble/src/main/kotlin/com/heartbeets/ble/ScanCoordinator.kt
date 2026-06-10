@@ -4,6 +4,7 @@ import android.bluetooth.le.ScanCallback
 import android.bluetooth.le.ScanResult
 import android.bluetooth.BluetoothManager
 import android.content.Context
+import android.util.Log
 import com.heartbeets.core.BleScanResult
 import com.heartbeets.core.DeviceRegistry
 import com.heartbeets.core.DiscoveredDevice
@@ -45,6 +46,8 @@ class ScanCoordinator(private val context: Context) {
                 val uuids = result.scanRecord?.serviceUuids
                     ?.map { it.uuid }
                     ?.toSet() ?: emptySet()
+
+                Log.d("ScanCoordinator", "raw: $address name=$name uuids=${uuids.map { it.toString().takeLast(8) }}")
 
                 val bleScan = BleScanResult(
                     deviceAddress = address,

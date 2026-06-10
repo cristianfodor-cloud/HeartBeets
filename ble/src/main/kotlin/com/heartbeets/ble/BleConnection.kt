@@ -8,6 +8,7 @@ import android.bluetooth.BluetoothGattDescriptor
 import android.bluetooth.BluetoothManager
 import android.bluetooth.BluetoothProfile
 import android.content.Context
+import android.util.Log
 import com.heartbeets.core.ConnectionState
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -60,6 +61,7 @@ class BleConnection(
     private val gattCallback = object : BluetoothGattCallback() {
 
         override fun onConnectionStateChange(g: BluetoothGatt, status: Int, newState: Int) {
+            Log.d(TAG, "onConnectionStateChange: newState=$newState status=$status")
             when (newState) {
                 BluetoothProfile.STATE_CONNECTED -> {
                     if (status == BluetoothGatt.GATT_SUCCESS) {
@@ -75,12 +77,34 @@ class BleConnection(
                 BluetoothProfile.STATE_DISCONNECTED -> {
                     _state.value = ConnectionState.Disconnected
                     pendingConnect.completeExceptionally(Exception("Disconnected, status $status"))
+                    // Always close the GATT handle on unexpected disconnects — otherwise the
+                    // phone keeps the connection slot open and the device stops advertising.
+                    g.close()
+                    gatt = null
                 }
             }
         }
 
         override fun onServicesDiscovered(g: BluetoothGatt, status: Int) {
+            Log.d(TAG, "onServicesDiscovered: status=$status services=${g.services.map { it.uuid }}")
             if (status == BluetoothGatt.GATT_SUCCESS) {
+                // Dump full GATT table so we can reverse-engineer unknown devices.
+                for (svc in g.services) {
+                    Log.d(TAG, "  SVC ${svc.uuid}")
+                    for (ch in svc.characteristics) {
+                        val props = buildString {
+                            if (ch.properties and BluetoothGattCharacteristic.PROPERTY_READ != 0) append("READ ")
+                            if (ch.properties and BluetoothGattCharacteristic.PROPERTY_WRITE != 0) append("WRITE ")
+                            if (ch.properties and BluetoothGattCharacteristic.PROPERTY_WRITE_NO_RESPONSE != 0) append("WRITE_NR ")
+                            if (ch.properties and BluetoothGattCharacteristic.PROPERTY_NOTIFY != 0) append("NOTIFY ")
+                            if (ch.properties and BluetoothGattCharacteristic.PROPERTY_INDICATE != 0) append("INDICATE ")
+                        }
+                        Log.d(TAG, "    CHAR ${ch.uuid} [$props]")
+                        for (desc in ch.descriptors) {
+                            Log.d(TAG, "      DESC ${desc.uuid}")
+                        }
+                    }
+                }
                 pendingDiscover.complete(Unit)
             } else {
                 pendingDiscover.completeExceptionally(
@@ -94,6 +118,7 @@ class BleConnection(
             descriptor: BluetoothGattDescriptor,
             status: Int,
         ) {
+            Log.d(TAG, "onDescriptorWrite: ${descriptor.uuid} status=$status")
             if (status == BluetoothGatt.GATT_SUCCESS) pendingWrite.complete(Unit)
             else pendingWrite.completeExceptionally(Exception("Descriptor write failed, status $status"))
         }
@@ -103,6 +128,7 @@ class BleConnection(
             characteristic: BluetoothGattCharacteristic,
             status: Int,
         ) {
+            Log.d(TAG, "onCharacteristicWrite: ${characteristic.uuid} status=$status")
             if (status == BluetoothGatt.GATT_SUCCESS) pendingWrite.complete(Unit)
             else pendingWrite.completeExceptionally(Exception("Characteristic write failed, status $status"))
         }
@@ -115,6 +141,7 @@ class BleConnection(
         ) {
             @Suppress("DEPRECATION")
             val value = characteristic.value ?: return
+            Log.d(TAG, "onCharacteristicChanged (legacy): ${characteristic.uuid} data=${value.toHex()}")
             scope.launch { notificationChannel.send(NotificationEvent(characteristic.uuid, value)) }
         }
 
@@ -124,6 +151,7 @@ class BleConnection(
             characteristic: BluetoothGattCharacteristic,
             value: ByteArray,
         ) {
+            Log.d(TAG, "onCharacteristicChanged: ${characteristic.uuid} data=${value.toHex()}")
             scope.launch { notificationChannel.send(NotificationEvent(characteristic.uuid, value)) }
         }
     }
@@ -159,17 +187,19 @@ class BleConnection(
         serviceUuid: UUID,
         charUuid: UUID,
         timeoutMs: Long = 5_000L,
+        cccdOverride: ByteArray? = null,
     ) = mutex.withLock {
         val g = gatt ?: error("Not connected")
         val service = g.getService(serviceUuid) ?: error("Service $serviceUuid not found")
         val char = service.getCharacteristic(charUuid) ?: error("Characteristic $charUuid not found")
+        Log.d(TAG, "enableNotifications: $charUuid properties=0x${char.properties.toString(16)}")
 
         g.setCharacteristicNotification(char, true)
 
         val cccd = char.getDescriptor(CCCD_UUID) ?: error("CCCD descriptor not found on $charUuid")
 
-        // Pick the right CCCD value based on supported properties.
-        val cccdValue = when {
+        // Pick the right CCCD value based on supported properties (or use override).
+        val cccdValue = cccdOverride ?: when {
             char.properties and BluetoothGattCharacteristic.PROPERTY_NOTIFY != 0 ->
                 BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
             char.properties and BluetoothGattCharacteristic.PROPERTY_INDICATE != 0 ->
@@ -184,14 +214,16 @@ class BleConnection(
     }
 
     /**
-     * Write [data] to a characteristic. Prefers WRITE (with response) if available,
-     * falls back to WRITE_NO_RESPONSE with a short delay.
+     * Write [data] to a characteristic.
+     * [forceNoResponse] forces WRITE_NO_RESPONSE (Write Command) regardless of properties.
+     * The HBand/VeePoo protocol uses Write Command on FEA2 per btsnoop capture.
      */
     suspend fun write(
         serviceUuid: UUID,
         charUuid: UUID,
         data: ByteArray,
         timeoutMs: Long = 5_000L,
+        forceNoResponse: Boolean = false,
     ) = mutex.withLock {
         val g = gatt ?: error("Not connected")
         val service = g.getService(serviceUuid) ?: error("Service $serviceUuid not found")
@@ -201,14 +233,14 @@ class BleConnection(
         val supportsNoResp = char.properties and
                 BluetoothGattCharacteristic.PROPERTY_WRITE_NO_RESPONSE != 0
 
-        if (supportsWrite || !supportsNoResp) {
+        if (!forceNoResponse && supportsWrite) {
             char.writeType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
             pendingWrite = CompletableDeferred()
             @Suppress("DEPRECATION") char.value = data
             @Suppress("DEPRECATION") g.writeCharacteristic(char)
             withTimeout(timeoutMs) { pendingWrite.await() }
         } else {
-            // WRITE_NO_RESPONSE — no callback, just write and add a small guard delay.
+            // WRITE_NO_RESPONSE (Write Command) — matches btsnoop: all VeePoo writes are Write Commands.
             char.writeType = BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE
             @Suppress("DEPRECATION") char.value = data
             @Suppress("DEPRECATION") g.writeCharacteristic(char)
@@ -225,7 +257,12 @@ class BleConnection(
         notificationChannel.close()
     }
 
+    /** Returns true if the device exposes the given service UUID (call after [connect]). */
+    fun hasService(serviceUuid: UUID): Boolean = gatt?.getService(serviceUuid) != null
+
     companion object {
         val CCCD_UUID: UUID = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
+        private const val TAG = "BleConnection"
+        private fun ByteArray.toHex() = joinToString(" ") { "%02X".format(it) }
     }
 }

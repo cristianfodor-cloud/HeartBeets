@@ -20,24 +20,34 @@ class ScanViewModel : ViewModel() {
     private val _scanning = MutableStateFlow(false)
     val scanning: StateFlow<Boolean> = _scanning.asStateFlow()
 
+    private val _error = MutableStateFlow<String?>(null)
+    val error: StateFlow<String?> = _error.asStateFlow()
+
     private var scanJob: Job? = null
 
     fun startScan(context: Context) {
         if (_scanning.value) return
         _devices.value = emptyList()
+        _error.value = null
         _scanning.value = true
         val coordinator = ScanCoordinator(context)
         scanJob = viewModelScope.launch {
-            coordinator.scan().collect { device ->
-                _devices.update { current ->
-                    val existing = current.indexOfFirst { it.address == device.address }
-                    if (existing >= 0) current.toMutableList().also { it[existing] = device }
-                    else (current + device).sortedByDescending { it.rssi }
+            try {
+                coordinator.scan().collect { device ->
+                    _devices.update { current ->
+                        val existing = current.indexOfFirst { it.address == device.address }
+                        if (existing >= 0) current.toMutableList().also { it[existing] = device }
+                        else (current + device).sortedByDescending { it.rssi }
+                    }
                 }
+            } catch (e: Exception) {
+                _error.value = e.message ?: "Scan failed"
             }
         }
         scanJob?.invokeOnCompletion { _scanning.value = false }
     }
+
+    fun clearError() { _error.value = null }
 
     fun stopScan() {
         scanJob?.cancel()

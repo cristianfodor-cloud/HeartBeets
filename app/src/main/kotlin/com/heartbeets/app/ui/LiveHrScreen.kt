@@ -16,10 +16,19 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.alpha
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -44,6 +53,7 @@ fun LiveHrScreen(
     val bpm by vm.bpm.collectAsState()
     val state by vm.connectionState.collectAsState()
     val battery by vm.battery.collectAsState()
+    val lastUpdatedMs by vm.lastUpdatedMs.collectAsState()
 
     Scaffold(
         topBar = {
@@ -82,6 +92,20 @@ fun LiveHrScreen(
             Spacer(Modifier.height(24.dp))
 
             if (bpm != null) {
+                // Live indicator — toggles alpha on every new sample so user can see data is streaming
+                val pulse by remember(lastUpdatedMs) { derivedStateOf { lastUpdatedMs % 2L == 0L } }
+                val dotAlpha by animateFloatAsState(
+                    targetValue = if (pulse) 1f else 0.2f,
+                    animationSpec = tween(durationMillis = 400),
+                    label = "liveDot",
+                )
+                androidx.compose.foundation.layout.Box(
+                    modifier = androidx.compose.ui.Modifier
+                        .padding(bottom = 8.dp)
+                        .alpha(dotAlpha)
+                        .background(Color(0xFFE53935), CircleShape)
+                        .padding(6.dp),
+                ) {}
                 Text(
                     text = "${bpm}",
                     fontSize = 96.sp,

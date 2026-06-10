@@ -28,7 +28,8 @@ class VeePooDriverFactory(private val context: Context) : HrDriverFactory {
             name.startsWith("H59", ignoreCase = true) -> Match.EXACT
             name.startsWith("ET585", ignoreCase = true) -> Match.EXACT
             name.startsWith("ET-", ignoreCase = true) -> Match.EXACT
-            // HBand / VeePoo devices sometimes advertise the NUS service.
+            // ET585 advertises FEE7 service; H59 advertises NUS.
+            scan.serviceUuids.contains(VeePooProtocol.FEE7_SERVICE) -> Match.LIKELY
             scan.serviceUuids.contains(VeePooProtocol.NUS_SERVICE) -> Match.LIKELY
             else -> Match.NO
         }

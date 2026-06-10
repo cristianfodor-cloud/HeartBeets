@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -424,7 +426,11 @@ fun LiveHrScreen(
             onDismissRequest = { showSoundPackSheet = false },
             sheetState = rememberModalBottomSheetState(),
         ) {
-            Column(Modifier.padding(16.dp)) {
+            Column(
+                Modifier
+                    .padding(16.dp)
+                    .verticalScroll(rememberScrollState())
+            ) {
                 Text("Select Sound Pack", style = MaterialTheme.typography.titleMedium)
                 Spacer(Modifier.height(12.dp))
                 SoundPackRegistry.getAll().forEach { pack ->

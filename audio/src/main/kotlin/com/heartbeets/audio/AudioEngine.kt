@@ -104,12 +104,23 @@ class AudioEngine(private val context: Context) {
      */
     fun setSoundPack(pack: SoundPack) {
         activePack = pack
-        val pcm = when {
+        val pcm = loadPcm(pack)
+        scheduler.setSample(pcm)
+    }
+
+    private fun loadPcm(pack: SoundPack): ShortArray {
+        var pcm = when {
             pack.synthParams != null -> HeartbeatSynthesizer.synthesize(pack.synthParams)
             pack.sampleRes != null -> PcmLoader.load(context, pack.sampleRes)
             else -> HeartbeatSynthesizer.synthesize(SynthParams.CLASSIC)
         }
-        scheduler.setSample(pcm)
+        pack.maxDurationMs?.let { maxMs ->
+            val maxSamples = (44100L * maxMs / 1000).toInt()
+            if (pcm.size > maxSamples) {
+                pcm = pcm.copyOfRange(0, maxSamples)
+            }
+        }
+        return pcm
     }
 
     /**
@@ -126,11 +137,11 @@ class AudioEngine(private val context: Context) {
      * Writes the PCM sample directly to a one-shot AudioTrack — no looping.
      */
     fun playBeatOnce() {
-        val pcm = when {
-            activePack?.synthParams != null -> HeartbeatSynthesizer.synthesize(activePack!!.synthParams!!)
-            activePack?.sampleRes != null -> PcmLoader.load(context, activePack!!.sampleRes!!)
-            else -> HeartbeatSynthesizer.synthesize(SynthParams.CLASSIC)
-        }
+        val pack = activePack ?: SoundPack(
+            id = "_default", displayName = "", description = "",
+            synthParams = SynthParams.CLASSIC
+        )
+        val pcm = loadPcm(pack)
         scope.launch(Dispatchers.Default) {
             val track = AudioTrack.Builder()
                 .setAudioAttributes(
@@ -169,6 +180,44 @@ class AudioEngine(private val context: Context) {
      */
     fun previewSynthParams(params: SynthParams) {
         val pcm = HeartbeatSynthesizer.synthesize(params)
+        scope.launch(Dispatchers.Default) {
+            val track = AudioTrack.Builder()
+                .setAudioAttributes(
+                    AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_MEDIA)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .build()
+                )
+                .setAudioFormat(
+                    AudioFormat.Builder()
+                        .setSampleRate(44100)
+                        .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
+                        .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                        .build()
+                )
+                .setBufferSizeInBytes(pcm.size * 2)
+                .setTransferMode(AudioTrack.MODE_STATIC)
+                .build()
+            try {
+                track.write(pcm, 0, pcm.size)
+                track.play()
+                val durationMs = (pcm.size * 1000L) / 44100
+                delay(durationMs + 50)
+            } catch (_: CancellationException) {
+                // Normal — user navigated away
+            } finally {
+                try { track.stop() } catch (_: IllegalStateException) {}
+                track.release()
+            }
+        }
+    }
+
+    /**
+     * Play a one-shot preview of a [SoundPack].
+     * Handles both synthesized and resource-based packs.
+     */
+    fun previewPack(pack: SoundPack) {
+        val pcm = loadPcm(pack)
         scope.launch(Dispatchers.Default) {
             val track = AudioTrack.Builder()
                 .setAudioAttributes(
@@ -254,8 +303,9 @@ class AudioEngine(private val context: Context) {
         )
         profileInterpolator = interpolator
         _mode.value = PlaybackMode.PROFILE
-        scheduler.updateBpm(currentBpm)
-        _currentBpm.value = currentBpm
+        val startCadence = interpolator.cadenceAt(System.currentTimeMillis())
+        scheduler.updateBpm(startCadence)
+        _currentBpm.value = startCadence
         scheduler.start()
 
         profileJob = scope.launch {

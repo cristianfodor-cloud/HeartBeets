@@ -139,9 +139,7 @@ class LiveHrViewModel(
     }
 
     fun previewPack(pack: SoundPack) {
-        audioEngine.previewSynthParams(
-            pack.synthParams ?: SynthParams.CLASSIC
-        )
+        audioEngine.previewPack(pack)
     }
 
     fun previewBeat() {

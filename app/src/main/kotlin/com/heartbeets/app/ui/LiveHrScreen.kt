@@ -17,6 +17,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.Button
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
@@ -67,6 +68,7 @@ fun LiveHrScreen(
     address: String,
     factoryId: String,
     onBack: () -> Unit,
+    onOpenSoundDesigner: (packId: String?) -> Unit = {},
     vm: LiveHrViewModel = viewModel(
         factory = LiveHrViewModelFactory(
             application = LocalContext.current.applicationContext as android.app.Application,
@@ -233,8 +235,12 @@ fun LiveHrScreen(
             }
 
             Spacer(Modifier.height(8.dp))
+            val activePackId by vm.activeSoundPackId.collectAsState()
+            val activePackName = remember(activePackId) {
+                SoundPackRegistry.getById(activePackId)?.displayName ?: "Classic"
+            }
             OutlinedButton(onClick = { showSoundPackSheet = true }) {
-                Text("Sound Pack")
+                Text("Sound Packs: $activePackName")
             }
 
             // --- D-pad: phase (left/right) and BPM offset (up/down) ---
@@ -413,6 +419,7 @@ fun LiveHrScreen(
 
     // Sound pack selection bottom sheet
     if (showSoundPackSheet) {
+        val activePackId by vm.activeSoundPackId.collectAsState()
         ModalBottomSheet(
             onDismissRequest = { showSoundPackSheet = false },
             sheetState = rememberModalBottomSheetState(),
@@ -421,13 +428,16 @@ fun LiveHrScreen(
                 Text("Select Sound Pack", style = MaterialTheme.typography.titleMedium)
                 Spacer(Modifier.height(12.dp))
                 SoundPackRegistry.getAll().forEach { pack ->
+                    val isSelected = pack.id == activePackId
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clickable {
-                                vm.setSoundPack(pack)
-                                showSoundPackSheet = false
-                            }
+                            .then(
+                                if (isSelected) Modifier.background(
+                                    MaterialTheme.colorScheme.primaryContainer,
+                                    MaterialTheme.shapes.medium,
+                                ) else Modifier
+                            )
                             .padding(vertical = 12.dp, horizontal = 8.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
@@ -440,10 +450,32 @@ fun LiveHrScreen(
                             )
                         }
                         Spacer(Modifier.width(8.dp))
-                        OutlinedButton(onClick = { vm.setSoundPack(pack); vm.previewBeat() }) {
-                            Text("Preview")
+                        OutlinedButton(onClick = { vm.previewPack(pack) }) {
+                            Text("\u25B6")
+                        }
+                        Spacer(Modifier.width(4.dp))
+                        if (isSelected) {
+                            FilledTonalButton(onClick = {}) {
+                                Text("\u2713 Used")
+                            }
+                        } else {
+                            Button(onClick = {
+                                vm.setSoundPack(pack)
+                            }) {
+                                Text("Use")
+                            }
                         }
                     }
+                }
+                HorizontalDivider(Modifier.padding(vertical = 8.dp))
+                Button(
+                    onClick = {
+                        showSoundPackSheet = false
+                        onOpenSoundDesigner(null)
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text("Create Custom Sound")
                 }
             }
         }

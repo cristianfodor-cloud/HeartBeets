@@ -2,34 +2,50 @@ package com.heartbeets.audio
 
 /**
  * Registry of available [SoundPack]s. Bundled packs are always present;
- * future versions may add downloaded or user-imported packs.
+ * user-created packs are added at runtime.
  */
 object SoundPackRegistry {
 
-    private val packs: List<SoundPack> = listOf(
+    private val builtInPacks: List<SoundPack> = listOf(
         SoundPack(
             id = "classic",
             displayName = "Classic",
             description = "Warm, realistic lub-dub heartbeat.",
-            sampleRes = R.raw.heartbeat_classic
+            synthParams = SynthParams.CLASSIC,
         ),
         SoundPack(
             id = "soft",
             displayName = "Soft",
             description = "Muffled, ambient-style pulse.",
-            sampleRes = R.raw.heartbeat_soft
+            synthParams = SynthParams.SOFT,
         ),
         SoundPack(
             id = "mechanical",
             displayName = "Mechanical",
             description = "Click/tick, metronome-like beat.",
-            sampleRes = R.raw.heartbeat_mechanical
+            synthParams = SynthParams.MECHANICAL,
         ),
     )
 
-    fun getAll(): List<SoundPack> = packs
+    private val userPacks = mutableListOf<SoundPack>()
 
-    fun getById(id: String): SoundPack? = packs.find { it.id == id }
+    fun getAll(): List<SoundPack> = builtInPacks + userPacks
 
-    fun getDefault(): SoundPack = packs.first()
+    fun getBuiltIn(): List<SoundPack> = builtInPacks
+
+    fun getUserPacks(): List<SoundPack> = userPacks.toList()
+
+    fun getById(id: String): SoundPack? =
+        builtInPacks.find { it.id == id } ?: userPacks.find { it.id == id }
+
+    fun getDefault(): SoundPack = builtInPacks.first()
+
+    fun addUserPack(pack: SoundPack) {
+        userPacks.removeAll { it.id == pack.id }
+        userPacks.add(pack)
+    }
+
+    fun removeUserPack(id: String) {
+        userPacks.removeAll { it.id == id }
+    }
 }

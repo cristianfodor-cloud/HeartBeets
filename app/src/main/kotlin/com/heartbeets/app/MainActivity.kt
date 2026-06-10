@@ -3,6 +3,7 @@ package com.heartbeets.app
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -11,6 +12,9 @@ import androidx.navigation.navArgument
 import com.heartbeets.app.ui.HeartBeetsTheme
 import com.heartbeets.app.ui.LiveHrScreen
 import com.heartbeets.app.ui.ScanScreen
+import com.heartbeets.app.ui.SoundDesignerScreen
+import com.heartbeets.app.ui.SoundDesignerViewModel
+import com.heartbeets.app.ui.SoundDesignerViewModelFactory
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -36,6 +40,32 @@ class MainActivity : ComponentActivity() {
                         LiveHrScreen(
                             address = backstack.arguments!!.getString("address")!!,
                             factoryId = backstack.arguments!!.getString("factoryId")!!,
+                            onBack = { nav.popBackStack() },
+                            onOpenSoundDesigner = { packId ->
+                                if (packId != null) {
+                                    nav.navigate("sound_designer/$packId")
+                                } else {
+                                    nav.navigate("sound_designer/new")
+                                }
+                            },
+                        )
+                    }
+                    composable(
+                        route = "sound_designer/{packId}",
+                        arguments = listOf(
+                            navArgument("packId") { type = NavType.StringType },
+                        ),
+                    ) { backstack ->
+                        val packId = backstack.arguments!!.getString("packId")!!
+                        val editId = if (packId == "new") null else packId
+                        val vm: SoundDesignerViewModel = viewModel(
+                            factory = SoundDesignerViewModelFactory(
+                                application = application,
+                                editPackId = editId,
+                            )
+                        )
+                        SoundDesignerScreen(
+                            viewModel = vm,
                             onBack = { nav.popBackStack() },
                         )
                     }

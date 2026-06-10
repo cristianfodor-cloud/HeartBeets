@@ -1,6 +1,9 @@
 package com.heartbeets.audio
 
 import android.content.Context
+import android.media.AudioAttributes
+import android.media.AudioFormat
+import android.media.AudioTrack
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
@@ -96,31 +99,104 @@ class AudioEngine(private val context: Context) {
     }
 
     /**
-     * Load a sound pack. The PCM sample is decoded and held in memory.
+     * Load a sound pack. The PCM sample is synthesized or decoded and held in memory.
      * Takes effect on the next beat if playback is active.
      */
     fun setSoundPack(pack: SoundPack) {
         activePack = pack
-        val pcm = PcmLoader.load(context, pack.sampleRes)
+        val pcm = when {
+            pack.synthParams != null -> HeartbeatSynthesizer.synthesize(pack.synthParams)
+            pack.sampleRes != null -> PcmLoader.load(context, pack.sampleRes)
+            else -> HeartbeatSynthesizer.synthesize(SynthParams.CLASSIC)
+        }
+        scheduler.setSample(pcm)
+    }
+
+    /**
+     * Load a sound directly from [SynthParams] without a SoundPack wrapper.
+     * Useful for live preview in the sound designer.
+     */
+    fun setSynthParams(params: SynthParams) {
+        val pcm = HeartbeatSynthesizer.synthesize(params)
         scheduler.setSample(pcm)
     }
 
     /**
      * Play the heartbeat sound once (for preview / testing).
-     * If not already playing, starts and stops the scheduler for one beat.
+     * Writes the PCM sample directly to a one-shot AudioTrack — no looping.
      */
     fun playBeatOnce() {
-        if (activePack == null) {
-            setSoundPack(SoundPackRegistry.getDefault())
+        val pcm = when {
+            activePack?.synthParams != null -> HeartbeatSynthesizer.synthesize(activePack!!.synthParams!!)
+            activePack?.sampleRes != null -> PcmLoader.load(context, activePack!!.sampleRes!!)
+            else -> HeartbeatSynthesizer.synthesize(SynthParams.CLASSIC)
         }
-        if (!scheduler.isPlaying) {
-            scheduler.updateBpm(72) // default preview tempo
-            scheduler.start()
-            scope.launch {
-                delay(900) // let one beat play (~830ms at 72 BPM)
-                if (_mode.value == PlaybackMode.STOPPED) {
-                    scheduler.stop()
-                }
+        scope.launch(Dispatchers.Default) {
+            val track = AudioTrack.Builder()
+                .setAudioAttributes(
+                    AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_MEDIA)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .build()
+                )
+                .setAudioFormat(
+                    AudioFormat.Builder()
+                        .setSampleRate(44100)
+                        .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
+                        .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                        .build()
+                )
+                .setBufferSizeInBytes(pcm.size * 2)
+                .setTransferMode(AudioTrack.MODE_STATIC)
+                .build()
+            try {
+                track.write(pcm, 0, pcm.size)
+                track.play()
+                val durationMs = (pcm.size * 1000L) / 44100
+                delay(durationMs + 50)
+            } catch (_: CancellationException) {
+                // Normal — user navigated away
+            } finally {
+                try { track.stop() } catch (_: IllegalStateException) {}
+                track.release()
+            }
+        }
+    }
+
+    /**
+     * Synthesize and play a one-shot preview from [SynthParams].
+     * Used by the sound designer for instant feedback.
+     */
+    fun previewSynthParams(params: SynthParams) {
+        val pcm = HeartbeatSynthesizer.synthesize(params)
+        scope.launch(Dispatchers.Default) {
+            val track = AudioTrack.Builder()
+                .setAudioAttributes(
+                    AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_MEDIA)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .build()
+                )
+                .setAudioFormat(
+                    AudioFormat.Builder()
+                        .setSampleRate(44100)
+                        .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
+                        .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                        .build()
+                )
+                .setBufferSizeInBytes(pcm.size * 2)
+                .setTransferMode(AudioTrack.MODE_STATIC)
+                .build()
+            try {
+                track.write(pcm, 0, pcm.size)
+                track.play()
+                val durationMs = (pcm.size * 1000L) / 44100
+                delay(durationMs + 50)
+            } catch (_: CancellationException) {
+                // Normal — user navigated away
+            } finally {
+                try { track.stop() } catch (_: IllegalStateException) {}
+                track.release()
             }
         }
     }
@@ -183,17 +259,19 @@ class AudioEngine(private val context: Context) {
         scheduler.start()
 
         profileJob = scope.launch {
-            while (true) {
-                val cadence = interpolator.cadenceAt(System.currentTimeMillis())
-                scheduler.updateBpm(cadence)
-                _currentBpm.value = cadence
+            try {
+                while (true) {
+                    val cadence = interpolator.cadenceAt(System.currentTimeMillis())
+                    scheduler.updateBpm(cadence)
+                    _currentBpm.value = cadence
 
-                if (interpolator.isFinished(System.currentTimeMillis())) {
-                    // Hold at final cadence — stay in PROFILE mode but stop updating
-                    break
+                    if (interpolator.isFinished(System.currentTimeMillis())) {
+                        // Hold at final cadence — stay in PROFILE mode but stop updating
+                        break
+                    }
+                    delay(200) // update cadence ~5 times per second
                 }
-                delay(200) // update cadence ~5 times per second
-            }
+            } catch (_: CancellationException) { /* normal shutdown */ }
         }
     }
 

@@ -12,6 +12,8 @@ import com.heartbeets.audio.ProfileAnchorMode
 import com.heartbeets.audio.ProfileRepository
 import com.heartbeets.audio.SoundPack
 import com.heartbeets.audio.SoundPackRegistry
+import com.heartbeets.audio.SoundPackRepository
+import com.heartbeets.audio.SynthParams
 import com.heartbeets.core.ConnectionState
 import com.heartbeets.core.DeviceRegistry
 import com.heartbeets.core.HrDriver
@@ -52,6 +54,7 @@ class LiveHrViewModel(
     // --- Audio ---
     val audioEngine = AudioEngine(application)
     val profileRepository = ProfileRepository(application)
+    private val soundPackRepository = SoundPackRepository(application)
     val playbackMode: StateFlow<PlaybackMode> = audioEngine.mode
     val playbackCadence: StateFlow<Int> = audioEngine.currentCadence
     val bpmOffset: StateFlow<Int> = audioEngine.bpmOffset
@@ -93,6 +96,7 @@ class LiveHrViewModel(
         }
         connect()
         loadProfiles()
+        viewModelScope.launch { soundPackRepository.loadAndRegister() }
     }
 
     fun connect() {
@@ -126,8 +130,18 @@ class LiveHrViewModel(
         audioEngine.stopPlayback()
     }
 
+    private val _activeSoundPackId = MutableStateFlow(SoundPackRegistry.getDefault().id)
+    val activeSoundPackId: StateFlow<String> = _activeSoundPackId.asStateFlow()
+
     fun setSoundPack(pack: SoundPack) {
         audioEngine.setSoundPack(pack)
+        _activeSoundPackId.value = pack.id
+    }
+
+    fun previewPack(pack: SoundPack) {
+        audioEngine.previewSynthParams(
+            pack.synthParams ?: SynthParams.CLASSIC
+        )
     }
 
     fun previewBeat() {

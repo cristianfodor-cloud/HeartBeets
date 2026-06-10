@@ -1,8 +1,9 @@
 # HeartBeets — Architecture
 
-> Scope: live heart-rate ingestion only. The music engine and social features are
-> separate concerns layered on top of this foundation and will get their own
-> documents when their time comes.
+> Scope: live heart-rate ingestion only. The audio engine (heartbeat sound
+> synthesis and cadence profiles) is documented in [AUDIO_ENGINE.md](AUDIO_ENGINE.md).
+> Social features are a separate concern and will get their own document when
+> the time comes.
 
 ## Goals
 

@@ -29,6 +29,7 @@ dependencies {
     implementation(project(":core"))
     implementation(project(":ble"))
     implementation(project(":data"))
+    implementation(project(":audio"))
     implementation(project(":service"))
     implementation(project(":driver-veepoo"))
     implementation(project(":driver-standard-hrs"))

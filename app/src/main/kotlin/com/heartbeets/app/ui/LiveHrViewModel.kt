@@ -5,12 +5,22 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.heartbeets.audio.AudioEngine
+import com.heartbeets.audio.HeartbeatProfile
+import com.heartbeets.audio.PlaybackMode
+import com.heartbeets.audio.ProfileAnchorMode
+import com.heartbeets.audio.ProfileRepository
+import com.heartbeets.audio.SoundPack
+import com.heartbeets.audio.SoundPackRegistry
 import com.heartbeets.core.ConnectionState
 import com.heartbeets.core.DeviceRegistry
 import com.heartbeets.core.HrDriver
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
 import com.heartbeets.core.ConnectionState as CS
@@ -39,36 +49,50 @@ class LiveHrViewModel(
     private val _lastUpdatedMs = MutableStateFlow(0L)
     val lastUpdatedMs: StateFlow<Long> = _lastUpdatedMs.asStateFlow()
 
+    // --- Audio ---
+    val audioEngine = AudioEngine(application)
+    val profileRepository = ProfileRepository(application)
+    val playbackMode: StateFlow<PlaybackMode> = audioEngine.mode
+    val playbackCadence: StateFlow<Int> = audioEngine.currentCadence
+    val bpmOffset: StateFlow<Int> = audioEngine.bpmOffset
+    val phaseOffsetMs: StateFlow<Int> = audioEngine.phaseOffsetMs
+
+    private val _profiles = MutableStateFlow<List<HeartbeatProfile>>(emptyList())
+    val profiles: StateFlow<List<HeartbeatProfile>> = _profiles.asStateFlow()
+
     init {
         driver?.let { d ->
             viewModelScope.launch {
-                d.samples.collect { sample ->
-                    _bpm.value = sample.bpm
-                    _lastUpdatedMs.value = sample.timestamp
-                }
+                try {
+                    d.samples.collect { sample ->
+                        _bpm.value = sample.bpm
+                        _lastUpdatedMs.value = sample.timestamp
+                    }
+                } catch (_: CancellationException) { /* normal on exit */ }
             }
             viewModelScope.launch {
-                d.state.collect { state ->
-                    if (state == CS.Disconnected || state == CS.Error) {
-                        _bpm.value = null
-                        _lastUpdatedMs.value = 0L
+                try {
+                    d.state.collect { state ->
+                        if (state == CS.Disconnected || state == CS.Error) {
+                            _bpm.value = null
+                            _lastUpdatedMs.value = 0L
+                        }
                     }
-                }
+                } catch (_: CancellationException) { /* normal on exit */ }
             }
-            // Clear stale BPM if no live D0 reading arrives within 5s of connect.
-            // During D0 01 warmup (~30s) the display shows "Measuring…" instead of a stale value.
             viewModelScope.launch {
-                d.state.collect { state ->
-                    if (state == CS.Connected) {
-                        _bpm.value = null
-                        delay(5_000)
-                        // After 5s if still null it will show "Measuring…" — that's correct.
-                        // Once D0 readings arrive they update _bpm normally.
+                try {
+                    d.state.collect { state ->
+                        if (state == CS.Connected) {
+                            _bpm.value = null
+                            delay(5_000)
+                        }
                     }
-                }
+                } catch (_: CancellationException) { /* normal on exit */ }
             }
         }
         connect()
+        loadProfiles()
     }
 
     fun connect() {
@@ -85,8 +109,58 @@ class LiveHrViewModel(
         }
     }
 
+    // --- Audio controls ---
+
+    fun startMirrorMode() {
+        val bpmFlow = _bpm.filterNotNull().map { it }
+        audioEngine.startMirrorMode(bpmFlow)
+    }
+
+    fun startProfile(profile: HeartbeatProfile, anchorMode: ProfileAnchorMode) {
+        val adjusted = profile.copy(anchorMode = anchorMode)
+        val currentBpm = _bpm.value ?: 72
+        audioEngine.startProfile(adjusted, currentBpm)
+    }
+
+    fun stopAudio() {
+        audioEngine.stopPlayback()
+    }
+
+    fun setSoundPack(pack: SoundPack) {
+        audioEngine.setSoundPack(pack)
+    }
+
+    fun previewBeat() {
+        audioEngine.playBeatOnce()
+    }
+
+    // --- Adjustments ---
+
+    fun adjustPhase(deltaMs: Int) {
+        audioEngine.adjustPhase(deltaMs)
+    }
+
+    fun adjustBpmOffset(delta: Int) {
+        audioEngine.adjustBpmOffset(delta)
+    }
+
+    fun resetAdjustments() {
+        audioEngine.resetAdjustments()
+    }
+
+    private fun loadProfiles() {
+        viewModelScope.launch {
+            _profiles.value = profileRepository.getAll()
+        }
+    }
+
     override fun onCleared() {
-        disconnect()
+        audioEngine.release()
+        // Don't use viewModelScope here — it's already cancelled.
+        // disconnect() synchronously since the driver handles it.
+        driver?.let {
+            runCatching { kotlinx.coroutines.runBlocking { it.disconnect() } }
+        }
     }
 }
 

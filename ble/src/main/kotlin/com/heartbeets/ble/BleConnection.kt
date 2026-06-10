@@ -18,7 +18,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeout
@@ -142,7 +141,7 @@ class BleConnection(
             @Suppress("DEPRECATION")
             val value = characteristic.value ?: return
             Log.d(TAG, "onCharacteristicChanged (legacy): ${characteristic.uuid} data=${value.toHex()}")
-            scope.launch { notificationChannel.send(NotificationEvent(characteristic.uuid, value)) }
+            notificationChannel.trySend(NotificationEvent(characteristic.uuid, value))
         }
 
         // Called on API 33+
@@ -152,7 +151,7 @@ class BleConnection(
             value: ByteArray,
         ) {
             Log.d(TAG, "onCharacteristicChanged: ${characteristic.uuid} data=${value.toHex()}")
-            scope.launch { notificationChannel.send(NotificationEvent(characteristic.uuid, value)) }
+            notificationChannel.trySend(NotificationEvent(characteristic.uuid, value))
         }
     }
 

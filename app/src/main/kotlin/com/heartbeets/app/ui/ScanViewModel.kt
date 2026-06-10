@@ -40,6 +40,8 @@ class ScanViewModel : ViewModel() {
                         else (current + device).sortedByDescending { it.rssi }
                     }
                 }
+            } catch (_: kotlinx.coroutines.CancellationException) {
+                // Normal — scope cancelled on navigation
             } catch (e: Exception) {
                 _error.value = e.message ?: "Scan failed"
             }

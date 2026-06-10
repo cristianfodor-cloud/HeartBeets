@@ -1,11 +1,14 @@
 package com.heartbeets.driver.standardhrs
 
 import android.content.Context
+import android.util.Log
 import com.heartbeets.ble.BleConnection
 import com.heartbeets.core.ConnectionState
 import com.heartbeets.core.HrDriver
 import com.heartbeets.core.HrSample
 import com.heartbeets.core.SourceTag
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -38,7 +41,10 @@ class StandardHrsDriver(
 
     override val displayName: String = name ?: "Heart Rate Sensor"
 
-    private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private val scopeExHandler = CoroutineExceptionHandler { _, t ->
+        if (t !is CancellationException) Log.w("StandardHrsDriver", "Coroutine error", t)
+    }
+    private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob() + scopeExHandler)
     private val connection = BleConnection(context, deviceAddress, scope)
 
     override val state: StateFlow<ConnectionState> = connection.state

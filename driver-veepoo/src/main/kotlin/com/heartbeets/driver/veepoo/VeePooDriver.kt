@@ -7,6 +7,8 @@ import com.heartbeets.core.ConnectionState
 import com.heartbeets.core.HrDriver
 import com.heartbeets.core.HrSample
 import com.heartbeets.core.SourceTag
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -38,7 +40,10 @@ class VeePooDriver(
 
     override val displayName: String = name ?: "VeePoo Device"
 
-    private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private val scopeExHandler = CoroutineExceptionHandler { _, t ->
+        if (t !is CancellationException) Log.w(TAG, "Coroutine error", t)
+    }
+    private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob() + scopeExHandler)
     private val connection = BleConnection(context, deviceAddress, scope)
 
     override val state: StateFlow<ConnectionState> = connection.state

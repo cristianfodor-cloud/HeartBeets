@@ -40,3 +40,9 @@ desktop.ini
 # Editor
 .vscode/
 *.swp
+
+# VeePoo SDK reverse-engineering artifacts (binary, not source)
+sdk_classes/
+*.class
+vpprotocol-classes.jar
+vpprotocol.zip

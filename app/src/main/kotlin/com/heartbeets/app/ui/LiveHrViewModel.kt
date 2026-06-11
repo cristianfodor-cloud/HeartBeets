@@ -47,6 +47,18 @@ class LiveHrViewModel(
     private val _bpm = MutableStateFlow<Int?>(null)
     val bpm: StateFlow<Int?> = _bpm.asStateFlow()
 
+    /** Whether BPM smoothing (rolling average) is enabled. */
+    private val _smoothingEnabled = MutableStateFlow(false)
+    val smoothingEnabled: StateFlow<Boolean> = _smoothingEnabled.asStateFlow()
+
+    /** Rolling window of recent BPM values for smoothing. */
+    private val bpmWindow = ArrayDeque<Int>(10)
+
+    fun toggleSmoothing() {
+        _smoothingEnabled.value = !_smoothingEnabled.value
+        bpmWindow.clear()
+    }
+
     /** Millisecond timestamp of the last received HR sample. Updates on every sample even if BPM is unchanged. */
     private val _lastUpdatedMs = MutableStateFlow(0L)
     val lastUpdatedMs: StateFlow<Long> = _lastUpdatedMs.asStateFlow()
@@ -68,7 +80,13 @@ class LiveHrViewModel(
             viewModelScope.launch {
                 try {
                     d.samples.collect { sample ->
-                        _bpm.value = sample.bpm
+                        if (_smoothingEnabled.value) {
+                            bpmWindow.addLast(sample.bpm)
+                            if (bpmWindow.size > 10) bpmWindow.removeFirst()
+                            _bpm.value = bpmWindow.average().toInt()
+                        } else {
+                            _bpm.value = sample.bpm
+                        }
                         _lastUpdatedMs.value = sample.timestamp
                     }
                 } catch (_: CancellationException) { /* normal on exit */ }

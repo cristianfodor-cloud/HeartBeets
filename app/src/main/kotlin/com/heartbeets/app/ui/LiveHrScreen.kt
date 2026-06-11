@@ -29,6 +29,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -194,6 +195,23 @@ fun LiveHrScreen(
                 battery?.let { pct ->
                     Text("Battery: $pct %", style = MaterialTheme.typography.bodySmall)
                 }
+            }
+
+            // --- Smoothing toggle ---
+            val smoothing by vm.smoothingEnabled.collectAsState()
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(vertical = 4.dp),
+            ) {
+                RadioButton(
+                    selected = smoothing,
+                    onClick = { vm.toggleSmoothing() },
+                )
+                Text(
+                    text = "Smooth BPM (avg last 10)",
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(start = 4.dp),
+                )
             }
 
             Spacer(Modifier.height(8.dp))

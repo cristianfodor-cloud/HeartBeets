@@ -21,8 +21,13 @@ class StandardHrsDriverFactory(private val context: Context) : HrDriverFactory {
     override val displayName = "Standard HR Sensor"
     override val manufacturerHint = "Any Bluetooth SIG HRS device"
 
-    override fun matches(scan: BleScanResult): Match =
-        if (scan.serviceUuids.contains(HrsProfile.HR_SERVICE)) Match.LIKELY else Match.NO
+    override fun matches(scan: BleScanResult): Match = when {
+        scan.serviceUuids.contains(HrsProfile.HR_SERVICE) -> Match.LIKELY
+        // Fallback: any named device might have HRS (discovered after GATT connect).
+        // Specialized drivers with EXACT matches override this.
+        scan.deviceName != null -> Match.LIKELY
+        else -> Match.NO
+    }
 
     override fun create(address: String, name: String?): HrDriver =
         StandardHrsDriver(context, address, name)

@@ -27,8 +27,6 @@ class VeePooDriverFactory(private val context: Context) : HrDriverFactory {
         return when {
             name.startsWith("ET585", ignoreCase = true) -> Match.EXACT
             name.startsWith("ET-", ignoreCase = true) -> Match.EXACT
-            // ET585 advertises FEE7 service.
-            scan.serviceUuids.contains(VeePooProtocol.FEE7_SERVICE) -> Match.LIKELY
             else -> Match.NO
         }
     }

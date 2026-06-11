@@ -227,7 +227,6 @@ class VeePooDriver(
                         HrSample(
                             bpm = response.bpm,
                             timestamp = System.currentTimeMillis(),
-                            // VeePoo does not provide R-R intervals.
                             rrIntervalsMs = null,
                             source = SourceTag("veepoo", deviceAddress),
                         )

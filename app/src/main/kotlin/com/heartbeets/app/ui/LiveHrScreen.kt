@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.KeyboardArrowRight
@@ -71,6 +72,7 @@ fun LiveHrScreen(
     factoryId: String,
     onBack: () -> Unit,
     onOpenSoundDesigner: (packId: String?) -> Unit = {},
+    onOpenProfileCreator: (profileId: String?) -> Unit = {},
     vm: LiveHrViewModel = viewModel(
         factory = LiveHrViewModelFactory(
             application = LocalContext.current.applicationContext as android.app.Application,
@@ -88,6 +90,18 @@ fun LiveHrScreen(
     val profiles by vm.profiles.collectAsState()
     val bpmOffset by vm.bpmOffset.collectAsState()
     val phaseOffset by vm.phaseOffsetMs.collectAsState()
+
+    // Refresh profiles whenever the screen resumes (e.g. after returning from creator)
+    val lifecycleOwner = androidx.compose.ui.platform.LocalLifecycleOwner.current
+    androidx.compose.runtime.DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                vm.refreshProfiles()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     var showProfileSheet by remember { mutableStateOf(false) }
     var showSoundPackSheet by remember { mutableStateOf(false) }
@@ -229,8 +243,10 @@ fun LiveHrScreen(
                         Button(onClick = { vm.stopAudio() }) {
                             Text("Stop")
                         }
+                        val activeProfileName by vm.activeProfileName.collectAsState()
                         OutlinedButton(onClick = { showProfileSheet = true }) {
-                            Text("Profiles")
+                            val label = activeProfileName?.let { "Profile: $it" } ?: "Profiles"
+                            Text(label)
                         }
                     }
                 }
@@ -370,10 +386,37 @@ fun LiveHrScreen(
                                 }) {
                                     Text("Fixed BPM")
                                 }
+                                if (!profile.isPreset) {
+                                    IconButton(
+                                        onClick = {
+                                            showProfileSheet = false
+                                            onOpenProfileCreator(profile.id)
+                                        },
+                                        modifier = Modifier.size(36.dp),
+                                    ) {
+                                        Icon(
+                                            imageVector = androidx.compose.material.icons.Icons.Filled.Edit,
+                                            contentDescription = "Edit profile",
+                                            tint = MaterialTheme.colorScheme.primary,
+                                        )
+                                    }
+                                }
                             }
                         }
+                        HorizontalDivider()
                     }
                 }
+                Spacer(Modifier.height(8.dp))
+                Button(
+                    onClick = {
+                        showProfileSheet = false
+                        onOpenProfileCreator(null)
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text("Create Custom Profile")
+                }
+                Spacer(Modifier.height(8.dp))
             }
         }
     }
@@ -401,7 +444,7 @@ fun LiveHrScreen(
             confirmButton = {
                 Button(
                     onClick = {
-                        val startBpm = absoluteBpmInput.toIntOrNull()?.coerceIn(30, 220) ?: 72
+                        val startBpm = absoluteBpmInput.toIntOrNull()?.coerceIn(1, 220) ?: 72
                         val adjusted = profile.copy(
                             anchorMode = ProfileAnchorMode.ABSOLUTE,
                             startBpm = startBpm,

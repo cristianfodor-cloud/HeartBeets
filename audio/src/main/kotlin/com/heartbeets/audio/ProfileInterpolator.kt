@@ -21,7 +21,7 @@ class ProfileInterpolator(
     fun cadenceAt(nowMs: Long): Int {
         val elapsedSec = ((nowMs - startTimeMs) / 1000f).coerceAtLeast(0f)
         val offset = offsetAt(elapsedSec)
-        return (anchorBpm + offset.toInt()).coerceIn(30, 220)
+        return (anchorBpm + offset.toInt()).coerceIn(1, 220)
     }
 
     /**

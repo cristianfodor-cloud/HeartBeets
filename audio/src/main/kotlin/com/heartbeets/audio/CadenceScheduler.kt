@@ -51,7 +51,7 @@ internal class CadenceScheduler {
      * Update the target cadence. The next beat will use this BPM.
      */
     fun updateBpm(bpm: Int) {
-        currentBpm.set(bpm.coerceIn(30, 220))
+        currentBpm.set(bpm.coerceIn(1, 220))
     }
 
     /**

@@ -12,6 +12,9 @@ import androidx.navigation.navArgument
 import com.heartbeets.app.ui.HeartBeetsTheme
 import com.heartbeets.app.ui.LiveHrScreen
 import com.heartbeets.app.ui.ScanScreen
+import com.heartbeets.app.ui.ProfileCreatorScreen
+import com.heartbeets.app.ui.ProfileCreatorViewModel
+import com.heartbeets.app.ui.ProfileCreatorViewModelFactory
 import com.heartbeets.app.ui.SoundDesignerScreen
 import com.heartbeets.app.ui.SoundDesignerViewModel
 import com.heartbeets.app.ui.SoundDesignerViewModelFactory
@@ -48,6 +51,9 @@ class MainActivity : ComponentActivity() {
                                     nav.navigate("sound_designer/new")
                                 }
                             },
+                            onOpenProfileCreator = { profileId ->
+                                nav.navigate("profile_creator/${profileId ?: "new"}")
+                            },
                         )
                     }
                     composable(
@@ -65,6 +71,25 @@ class MainActivity : ComponentActivity() {
                             )
                         )
                         SoundDesignerScreen(
+                            viewModel = vm,
+                            onBack = { nav.popBackStack() },
+                        )
+                    }
+                    composable(
+                        route = "profile_creator/{profileId}",
+                        arguments = listOf(
+                            navArgument("profileId") { type = NavType.StringType },
+                        ),
+                    ) { backstack ->
+                        val profileId = backstack.arguments!!.getString("profileId")!!
+                        val editId = if (profileId == "new") null else profileId
+                        val vm: ProfileCreatorViewModel = viewModel(
+                            factory = ProfileCreatorViewModelFactory(
+                                application = application,
+                                editProfileId = editId,
+                            )
+                        )
+                        ProfileCreatorScreen(
                             viewModel = vm,
                             onBack = { nav.popBackStack() },
                         )

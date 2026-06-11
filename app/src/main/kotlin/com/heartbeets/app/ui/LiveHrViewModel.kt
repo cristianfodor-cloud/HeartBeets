@@ -115,19 +115,25 @@ class LiveHrViewModel(
 
     // --- Audio controls ---
 
+    private val _activeProfileName = MutableStateFlow<String?>(null)
+    val activeProfileName: StateFlow<String?> = _activeProfileName.asStateFlow()
+
     fun startMirrorMode() {
         val bpmFlow = _bpm.filterNotNull().map { it }
         audioEngine.startMirrorMode(bpmFlow)
+        _activeProfileName.value = null
     }
 
     fun startProfile(profile: HeartbeatProfile, anchorMode: ProfileAnchorMode) {
         val adjusted = profile.copy(anchorMode = anchorMode)
         val currentBpm = _bpm.value ?: 72
         audioEngine.startProfile(adjusted, currentBpm)
+        _activeProfileName.value = profile.name
     }
 
     fun stopAudio() {
         audioEngine.stopPlayback()
+        _activeProfileName.value = null
     }
 
     private val _activeSoundPackId = MutableStateFlow(SoundPackRegistry.getDefault().id)
@@ -158,6 +164,10 @@ class LiveHrViewModel(
 
     fun resetAdjustments() {
         audioEngine.resetAdjustments()
+    }
+
+    fun refreshProfiles() {
+        loadProfiles()
     }
 
     private fun loadProfiles() {

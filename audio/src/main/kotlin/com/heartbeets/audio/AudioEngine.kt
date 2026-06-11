@@ -78,7 +78,7 @@ class AudioEngine(private val context: Context) {
      * Immediately updates the scheduler so the change is heard on the next beat.
      */
     fun adjustBpmOffset(delta: Int) {
-        _bpmOffset.value = (_bpmOffset.value + delta).coerceIn(-30, 30)
+        _bpmOffset.value = (_bpmOffset.value + delta).coerceIn(-60, 60)
         applyBpmImmediately()
     }
 
@@ -91,10 +91,21 @@ class AudioEngine(private val context: Context) {
     }
 
     private fun applyBpmImmediately() {
-        if (lastRawBpm > 0 && _mode.value == PlaybackMode.MIRROR) {
-            val adjusted = (lastRawBpm + _bpmOffset.value).coerceIn(30, 220)
-            scheduler.updateBpm(adjusted)
-            _currentBpm.value = adjusted
+        when (_mode.value) {
+            PlaybackMode.MIRROR -> {
+                if (lastRawBpm > 0) {
+                    val adjusted = (lastRawBpm + _bpmOffset.value).coerceIn(1, 220)
+                    scheduler.updateBpm(adjusted)
+                    _currentBpm.value = adjusted
+                }
+            }
+            PlaybackMode.PROFILE -> {
+                val interpolator = profileInterpolator ?: return
+                val cadence = (interpolator.cadenceAt(System.currentTimeMillis()) + _bpmOffset.value).coerceIn(1, 220)
+                scheduler.updateBpm(cadence)
+                _currentBpm.value = cadence
+            }
+            else -> {}
         }
     }
 
@@ -268,7 +279,7 @@ class AudioEngine(private val context: Context) {
                 bpmFlow.collect { bpm ->
                     if (bpm > 0) {
                         lastRawBpm = bpm
-                        val adjusted = (bpm + _bpmOffset.value).coerceIn(30, 220)
+                        val adjusted = (bpm + _bpmOffset.value).coerceIn(1, 220)
                         scheduler.updateBpm(adjusted)
                         _currentBpm.value = adjusted
                         if (!started) {
@@ -303,7 +314,7 @@ class AudioEngine(private val context: Context) {
         )
         profileInterpolator = interpolator
         _mode.value = PlaybackMode.PROFILE
-        val startCadence = interpolator.cadenceAt(System.currentTimeMillis())
+        val startCadence = (interpolator.cadenceAt(System.currentTimeMillis()) + _bpmOffset.value).coerceIn(1, 220)
         scheduler.updateBpm(startCadence)
         _currentBpm.value = startCadence
         scheduler.start()
@@ -311,7 +322,7 @@ class AudioEngine(private val context: Context) {
         profileJob = scope.launch {
             try {
                 while (true) {
-                    val cadence = interpolator.cadenceAt(System.currentTimeMillis())
+                    val cadence = (interpolator.cadenceAt(System.currentTimeMillis()) + _bpmOffset.value).coerceIn(1, 220)
                     scheduler.updateBpm(cadence)
                     _currentBpm.value = cadence
 

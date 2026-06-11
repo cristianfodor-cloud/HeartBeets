@@ -33,6 +33,7 @@ dependencies {
     implementation(project(":service"))
     implementation(project(":driver-veepoo"))
     implementation(project(":driver-standard-hrs"))
+    implementation(project(":driver-huami"))
 
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.ui)

@@ -22,6 +22,15 @@ object HrsProfile {
     /** Battery Level characteristic (read/notify, uint8 0–100). */
     val BATTERY_LEVEL: UUID = UUID.fromString("00002a19-0000-1000-8000-00805f9b34fb")
 
+    /** Heart Rate Control Point characteristic (write) — used to start continuous HR on some devices. */
+    val HR_CONTROL_POINT: UUID = UUID.fromString("00002a39-0000-1000-8000-00805f9b34fb")
+
+    /** Command to start continuous heart rate measurement. */
+    val CMD_START_CONTINUOUS_HR: ByteArray = byteArrayOf(0x15, 0x01, 0x01)
+
+    /** Command to stop continuous heart rate measurement. */
+    val CMD_STOP_CONTINUOUS_HR: ByteArray = byteArrayOf(0x15, 0x01, 0x00)
+
     // ──────────── Heart Rate Measurement flags byte ────────────
 
     /** Bit 0 of flags: 0 = BPM is uint8, 1 = BPM is uint16. */

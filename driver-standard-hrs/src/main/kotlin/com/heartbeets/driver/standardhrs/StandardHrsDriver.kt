@@ -69,6 +69,17 @@ class StandardHrsDriver(
             connection.enableNotifications(HrsProfile.BATTERY_SERVICE, HrsProfile.BATTERY_LEVEL)
         }
 
+        // Try to start continuous HR measurement via the HR Control Point.
+        // Many devices (Xiaomi "Expose HR to 3rd party", some Polar, etc.) need this
+        // to start streaming. It's harmless on devices that don't support it.
+        runCatching {
+            connection.write(
+                HrsProfile.HR_SERVICE,
+                HrsProfile.HR_CONTROL_POINT,
+                HrsProfile.CMD_START_CONTINUOUS_HR,
+            )
+        }
+
         notifyJob = scope.launch {
             connection.notifications.collect { event ->
                 when (event.characteristicUuid) {

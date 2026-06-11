@@ -78,16 +78,19 @@ class HuaweiDriver(
         }
 
         // Send link params (basic handshake).
-        sendLinkParams()
+        // NOTE: Full Huawei protocol requires HiChain/HiChainLite challenge-response auth.
+        // These commands will only succeed on devices already bonded + authenticated via
+        // Huawei Health app. We wrap each in runCatching to gracefully handle auth failures.
+        runCatching { sendLinkParams() }
 
         // Request battery info.
-        requestBattery()
+        runCatching { requestBattery() }
 
         // Enable automatic heart rate monitoring.
-        enableAutoHeartRate()
+        runCatching { enableAutoHeartRate() }
 
         // Enable real-time HR reporting.
-        enableRealtimeHeartRate()
+        runCatching { enableRealtimeHeartRate() }
     }
 
     override suspend fun disconnect() {
@@ -200,20 +203,57 @@ class HuaweiDriver(
     }
 
     private fun parseFitnessData(commandId: Byte, payload: ByteArray) {
-        // Real-time HR: command=0x23, TLV contains HR in tag=0x01 or tag=0x02
-        // Auto HR notification also arrives here.
-        // Look for any byte value in range 30-250 as heart rate.
+        // Huawei fitness data uses bitmap-encoded fields per Gadgetbridge's StepResponse:
+        //   - featureBitmap byte(s) indicate which fields follow
+        //   - bit 0x40 in bitmap1 = heart rate (single byte)
+        //   - Realtime HR notifications (cmd=0x23) use simpler TLV format
+        //
+        // Try TLV-based parsing first (for realtime HR notifications),
+        // then fall back to scanning for plausible HR values.
+        val cmdInt = commandId.toInt() and 0xFF
+
+        // For realtime HR (cmd=0x23) or rest HR (cmd=0x23), try TLV tags
         val hrByte = findTlvByte(payload, 0x02) ?: findTlvByte(payload, 0x01)
         if (hrByte != null) {
             val hr = hrByte.toInt() and 0xFF
             if (hr in 30..250) {
-                Log.d(TAG, "HR: $hr bpm (cmd=0x%02X)".format(commandId))
+                Log.d(TAG, "HR: $hr bpm (cmd=0x%02X)".format(cmdInt))
                 _samples.tryEmit(
                     HrSample(
                         bpm = hr,
                         source = SourceTag(driverId = "huawei", deviceAddress = deviceAddress),
                     )
                 )
+                return
+            }
+        }
+
+        // Fallback: Bitmap-encoded step data (Gadgetbridge FitnessData.StepResponse)
+        // bit 0x40 of featureBitmap1 = HR as single byte
+        if (payload.isNotEmpty()) {
+            val bitmap = payload[0].toInt() and 0x7F // ignore sign bit
+            if ((bitmap and 0x40) != 0) {
+                // Count preceding fields to find HR offset
+                var offset = 1
+                if ((bitmap and 0x80.toByte().toInt()) != 0) offset++ // second bitmap byte
+                // Each set bit before 0x40 contributes 2 bytes (uint16), except 0x20 and 0x40 which are 1 byte
+                for (bit in listOf(0x01, 0x02, 0x04, 0x08, 0x10)) {
+                    if ((bitmap and bit) != 0) offset += 2
+                }
+                if ((bitmap and 0x20) != 0) offset += 1
+                // Now offset points to the HR byte
+                if (offset < payload.size) {
+                    val hr = payload[offset].toInt() and 0xFF
+                    if (hr in 30..250) {
+                        Log.d(TAG, "HR (bitmap): $hr bpm (cmd=0x%02X)".format(cmdInt))
+                        _samples.tryEmit(
+                            HrSample(
+                                bpm = hr,
+                                source = SourceTag(driverId = "huawei", deviceAddress = deviceAddress),
+                            )
+                        )
+                    }
+                }
             }
         }
     }

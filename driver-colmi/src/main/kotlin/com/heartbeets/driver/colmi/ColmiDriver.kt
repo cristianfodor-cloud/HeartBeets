@@ -128,8 +128,18 @@ class ColmiDriver(
     }
 
     private fun handleLiveHr(data: ByteArray) {
-        if (data.size < 2) return
-        val hr = data[1].toInt() and 0xFF
+        // Packet format per Gadgetbridge ColmiR0xPacketHandler.liveHeartRate():
+        //   data[0] = CMD_MANUAL_HEART_RATE (0x69)
+        //   data[1] = sub-type (unused)
+        //   data[2] = error code: 0=OK, 1=worn incorrectly, 2=temporary error
+        //   data[3] = HR BPM value
+        if (data.size < 4) return
+        val errorCode = data[2].toInt() and 0xFF
+        if (errorCode != 0) {
+            Log.w(TAG, "Live HR error code $errorCode (1=worn incorrectly, 2=temp error)")
+            return
+        }
+        val hr = data[3].toInt() and 0xFF
         if (hr == 0) {
             Log.d(TAG, "HR measurement in progress (value=0, measuring...)")
             return

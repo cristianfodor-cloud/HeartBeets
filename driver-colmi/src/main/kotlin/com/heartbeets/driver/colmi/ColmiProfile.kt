@@ -43,7 +43,8 @@ object ColmiProfile {
     val KNOWN_NAME_PREFIXES = listOf(
         "colmi r0", "colmi r1", "colmi p",
         "r02", "r03", "r06", "r10",
-        "p8", "p9", "p10",
+        "h59",
+        "p8", "p9", "p10", "p11",
         "ym_r0", "ym_r1",
         "hk ring",
     )

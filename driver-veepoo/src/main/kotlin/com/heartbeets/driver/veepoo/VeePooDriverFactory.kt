@@ -25,12 +25,10 @@ class VeePooDriverFactory(private val context: Context) : HrDriverFactory {
     override fun matches(scan: BleScanResult): Match {
         val name = scan.deviceName.orEmpty()
         return when {
-            name.startsWith("H59", ignoreCase = true) -> Match.EXACT
             name.startsWith("ET585", ignoreCase = true) -> Match.EXACT
             name.startsWith("ET-", ignoreCase = true) -> Match.EXACT
-            // ET585 advertises FEE7 service; H59 advertises NUS.
+            // ET585 advertises FEE7 service.
             scan.serviceUuids.contains(VeePooProtocol.FEE7_SERVICE) -> Match.LIKELY
-            scan.serviceUuids.contains(VeePooProtocol.NUS_SERVICE) -> Match.LIKELY
             else -> Match.NO
         }
     }

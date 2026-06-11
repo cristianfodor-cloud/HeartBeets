@@ -12,7 +12,7 @@ import java.util.UUID
  */
 object VeePooProtocol {
 
-    // ──────────── H59 path: NUS service ────────────
+    // ──────────── NUS service (legacy, not used by any current device) ────────────
 
     val NUS_SERVICE: UUID = UUID.fromString("6e400001-b5a3-f393-e0a9-e50e24dcca9e")
     val NUS_RX: UUID     = UUID.fromString("6e400002-b5a3-f393-e0a9-e50e24dcca9e")

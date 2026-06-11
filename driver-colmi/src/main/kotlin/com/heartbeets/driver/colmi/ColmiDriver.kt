@@ -14,6 +14,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -57,6 +58,10 @@ class ColmiDriver(
     override val battery: StateFlow<Int?> = _battery.asStateFlow()
 
     private var notifyJob: Job? = null
+    private var hrLoopJob: Job? = null
+    private var lastEmittedBpm: Int = 0
+    private var lastEmittedTime: Long = 0L
+    @Volatile private var lastNotificationTime: Long = 0L
 
     override suspend fun connect() {
         connection.connect()
@@ -82,30 +87,29 @@ class ColmiDriver(
         // Request battery info.
         writeCommand(ColmiProfile.CMD_BATTERY)
 
-        // Start live HR measurement.
-        startHeartRate()
+        // Start live HR measurement — re-triggers quickly when measurement stops.
+        hrLoopJob = scope.launch {
+            // Initial start.
+            runCatching { writeCommand(ColmiProfile.CMD_MANUAL_HEART_RATE, 0x01) }
+            while (true) {
+                delay(3_000)
+                // If no notification received in the last 2s, the band stopped — re-trigger.
+                if (System.currentTimeMillis() - lastNotificationTime > 2_000) {
+                    runCatching { writeCommand(ColmiProfile.CMD_MANUAL_HEART_RATE, 0x01) }
+                }
+            }
+        }
     }
 
     override suspend fun disconnect() {
+        hrLoopJob?.cancel()
+        hrLoopJob = null
         // Stop live HR.
         runCatching { writeCommand(ColmiProfile.CMD_MANUAL_HEART_RATE, 0x00) }
         notifyJob?.cancel()
         notifyJob = null
         connection.disconnect()
         scope.cancel()
-    }
-
-    /**
-     * Start a live (manual) heart rate measurement.
-     * The ring sends periodic HR updates until stopped.
-     */
-    private suspend fun startHeartRate() {
-        writeCommand(ColmiProfile.CMD_MANUAL_HEART_RATE, 0x01)
-
-        // Also enable auto HR measurement at 5-minute intervals for continuous streaming.
-        runCatching {
-            writeCommand(ColmiProfile.CMD_AUTO_HR_PREF, ColmiProfile.PREF_WRITE, 0x01, 0x05)
-        }
     }
 
     private suspend fun writeCommand(vararg contents: Byte) {
@@ -115,10 +119,15 @@ class ColmiDriver(
 
     private fun handleV1Notification(data: ByteArray) {
         if (data.isEmpty()) return
+        lastNotificationTime = System.currentTimeMillis()
         when (data[0]) {
             ColmiProfile.CMD_MANUAL_HEART_RATE -> handleLiveHr(data)
             ColmiProfile.CMD_BATTERY -> handleBattery(data)
             ColmiProfile.CMD_NOTIFICATION -> handleNotification(data)
+        }
+        // 0x73 0x01 = measurement done signal — immediately re-trigger
+        if (data[0] == ColmiProfile.CMD_NOTIFICATION && data.size >= 2 && data[1] == 0x01.toByte()) {
+            scope.launch { runCatching { writeCommand(ColmiProfile.CMD_MANUAL_HEART_RATE, 0x01) } }
         }
     }
 
@@ -140,10 +149,14 @@ class ColmiDriver(
             return
         }
         val hr = data[3].toInt() and 0xFF
-        if (hr == 0) {
-            Log.d(TAG, "HR measurement in progress (value=0, measuring...)")
-            return
-        }
+        if (hr == 0) return // Still measuring, no value yet
+
+        // Deduplicate — the device sends the same reading ~2x per second.
+        val now = System.currentTimeMillis()
+        if (hr == lastEmittedBpm && now - lastEmittedTime < 2000) return
+        lastEmittedBpm = hr
+        lastEmittedTime = now
+
         Log.d(TAG, "Live HR: $hr bpm")
         _samples.tryEmit(
             HrSample(
@@ -162,14 +175,14 @@ class ColmiDriver(
     }
 
     private fun handleNotification(data: ByteArray) {
-        if (data.size < 2) return
+        if (data.size < 3) return
         when (data[1]) {
             ColmiProfile.NOTIFICATION_BATTERY_LEVEL -> {
-                if (data.size >= 4) {
-                    _battery.value = data[2].toInt() and 0xFF
-                }
+                val level = data[2].toInt() and 0xFF
+                Log.d(TAG, "Battery notification: $level%")
+                _battery.value = level
             }
-            else -> Log.d(TAG, "Ring notification type: ${data[1]}")
+            else -> Log.d(TAG, "Ring notification type: 0x${String.format("%02X", data[1])}")
         }
     }
 

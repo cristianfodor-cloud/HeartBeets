@@ -64,7 +64,11 @@ import com.heartbeets.audio.PlaybackMode
 import com.heartbeets.audio.HeartbeatProfile
 import com.heartbeets.audio.ProfileAnchorMode
 import com.heartbeets.audio.SoundPackRegistry
+import com.heartbeets.audio.SynthParams
 import com.heartbeets.core.ConnectionState
+import com.heartbeets.sharing.ShareViewModel
+import com.heartbeets.sharing.SharedProfile
+import com.heartbeets.sharing.SynthParamsDto
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -80,6 +84,9 @@ fun LiveHrScreen(
             address = address,
             factoryId = factoryId,
         ),
+    ),
+    shareVm: ShareViewModel = viewModel(
+        viewModelStoreOwner = LocalContext.current as androidx.activity.ComponentActivity,
     ),
 ) {
     val bpm by vm.bpm.collectAsState()
@@ -102,6 +109,14 @@ fun LiveHrScreen(
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    // Push BPM to Firebase when live
+    val sharingActive by shareVm.isLive.collectAsState()
+    androidx.compose.runtime.LaunchedEffect(bpm, sharingActive) {
+        if (sharingActive && bpm != null) {
+            shareVm.pushBpm(bpm!!)
+        }
     }
 
     var showProfileSheet by remember { mutableStateOf(false) }
@@ -212,6 +227,46 @@ fun LiveHrScreen(
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.padding(start = 4.dp),
                 )
+            }
+
+            // --- Live Sharing ---
+            val isLive by shareVm.isLive.collectAsState()
+            val shareError by shareVm.error.collectAsState()
+
+            // Show error toast
+            val toastContext = LocalContext.current
+            androidx.compose.runtime.LaunchedEffect(shareError) {
+                shareError?.let {
+                    android.widget.Toast.makeText(toastContext, it, android.widget.Toast.LENGTH_SHORT).show()
+                    shareVm.clearError()
+                }
+            }
+
+            Spacer(Modifier.height(4.dp))
+            if (!isLive) {
+                OutlinedButton(onClick = {
+                    if (bpm == null) {
+                        android.widget.Toast.makeText(toastContext, "No HR available yet", android.widget.Toast.LENGTH_SHORT).show()
+                        return@OutlinedButton
+                    }
+                    val packId = vm.activeSoundPackId.value
+                    val pack = SoundPackRegistry.getById(packId)
+                    val synthParams = pack?.synthParams ?: SynthParams.CLASSIC
+                    val profile = SharedProfile(
+                        id = packId,
+                        name = pack?.displayName ?: "Heartbeat",
+                        version = 1,
+                        createdBy = "",
+                        synthParams = SynthParamsDto.from(synthParams),
+                    )
+                    shareVm.goLive(profile)
+                }) {
+                    Text("Go Live")
+                }
+            } else {
+                Button(onClick = { shareVm.goOffline() }) {
+                    Text("\u2764 LIVE — Tap to stop")
+                }
             }
 
             Spacer(Modifier.height(8.dp))

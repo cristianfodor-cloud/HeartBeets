@@ -26,6 +26,7 @@ import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Snackbar
 import androidx.compose.material3.SnackbarHost
@@ -49,6 +50,8 @@ import com.heartbeets.core.Match
 @Composable
 fun ScanScreen(
     onDeviceSelected: (address: String, factoryId: String) -> Unit,
+    onListenClicked: () -> Unit = {},
+    onHeartCodesClicked: () -> Unit = {},
     vm: ScanViewModel = viewModel(),
 ) {
     val devices by vm.devices.collectAsState()
@@ -93,6 +96,24 @@ fun ScanScreen(
                 enabled = !scanning,
             ) {
                 Text(if (scanning) "Scanning…" else "Scan for devices")
+            }
+
+            Spacer(Modifier.height(8.dp))
+
+            OutlinedButton(
+                onClick = onListenClicked,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text("Listen to a Heartbeat")
+            }
+
+            Spacer(Modifier.height(8.dp))
+
+            OutlinedButton(
+                onClick = onHeartCodesClicked,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text("My HeartCodes")
             }
 
             Spacer(Modifier.height(12.dp))

@@ -2,6 +2,7 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.google.services)
 }
 
 android {
@@ -37,6 +38,7 @@ dependencies {
     implementation(project(":driver-colmi"))
     implementation(project(":driver-huawei"))
     implementation(project(":driver-galaxy"))
+    implementation(project(":sharing"))
 
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.ui)
@@ -49,6 +51,13 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.androidx.core.ktx)
+
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.auth.ktx)
+    implementation(libs.firebase.database.ktx)
+    implementation(libs.firebase.firestore.ktx)
+
+    implementation(libs.zxing.core)
 
     debugImplementation(libs.compose.ui.tooling)
 }

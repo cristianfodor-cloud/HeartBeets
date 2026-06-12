@@ -25,7 +25,7 @@ import java.util.concurrent.atomic.AtomicReference
  */
 internal class CadenceScheduler {
 
-    private val sampleRate = PcmLoader.SAMPLE_RATE
+    private val sampleRate = 44_100
     private val currentBpm = AtomicInteger(72)
     private val pcmBuffer = AtomicReference<ShortArray>(null)
 

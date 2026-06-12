@@ -120,18 +120,7 @@ class AudioEngine(private val context: Context) {
     }
 
     private fun loadPcm(pack: SoundPack): ShortArray {
-        var pcm = when {
-            pack.synthParams != null -> HeartbeatSynthesizer.synthesize(pack.synthParams)
-            pack.sampleRes != null -> PcmLoader.load(context, pack.sampleRes)
-            else -> HeartbeatSynthesizer.synthesize(SynthParams.CLASSIC)
-        }
-        pack.maxDurationMs?.let { maxMs ->
-            val maxSamples = (44100L * maxMs / 1000).toInt()
-            if (pcm.size > maxSamples) {
-                pcm = pcm.copyOfRange(0, maxSamples)
-            }
-        }
-        return pcm
+        return HeartbeatSynthesizer.synthesize(pack.synthParams ?: SynthParams.CLASSIC)
     }
 
     /**

@@ -65,6 +65,7 @@ fun HeartCodeScreen(
     var codeToShowQr by remember { mutableStateOf<HeartCode?>(null) }
 
     Scaffold(
+        containerColor = androidx.compose.ui.graphics.Color.Transparent,
         topBar = {
             CenterAlignedTopAppBar(
                 title = { Text("HeartCodes") },

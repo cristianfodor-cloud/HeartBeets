@@ -125,6 +125,7 @@ fun LiveHrScreen(
     var absoluteBpmInput by remember { mutableStateOf("") }
 
     Scaffold(
+        containerColor = androidx.compose.ui.graphics.Color.Transparent,
         topBar = {
             CenterAlignedTopAppBar(
                 title = { Text(vm.displayName) },

@@ -4,7 +4,13 @@ import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -28,7 +34,14 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setContent {
             HeartBeetsTheme {
-                val nav = rememberNavController()
+                Box(Modifier.fillMaxSize()) {
+                    Image(
+                        painter = painterResource(R.drawable.bg_app),
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop,
+                    )
+                    val nav = rememberNavController()
 
                 // Handle deep link: heartbeets://add/{code}
                 LaunchedEffect(Unit) {
@@ -125,6 +138,7 @@ class MainActivity : ComponentActivity() {
                         )
                     }
                 }
+                } // Box
             }
         }
     }

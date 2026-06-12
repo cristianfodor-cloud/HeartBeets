@@ -24,6 +24,7 @@ fun SoundDesignerScreen(
     val description by viewModel.description.collectAsState()
 
     Scaffold(
+        containerColor = androidx.compose.ui.graphics.Color.Transparent,
         topBar = {
             TopAppBar(
                 title = { Text("Sound Designer") },

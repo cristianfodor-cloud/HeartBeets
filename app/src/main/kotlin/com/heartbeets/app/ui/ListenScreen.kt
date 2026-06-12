@@ -61,6 +61,7 @@ fun ListenScreen(
     var showAddDialogWithCode by remember { mutableStateOf(prefillCode) }
 
     Scaffold(
+        containerColor = androidx.compose.ui.graphics.Color.Transparent,
         topBar = {
             CenterAlignedTopAppBar(
                 title = { Text("Friends") },

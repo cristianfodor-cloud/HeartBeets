@@ -74,6 +74,7 @@ fun ScanScreen(
     }
 
     Scaffold(
+        containerColor = androidx.compose.ui.graphics.Color.Transparent,
         topBar = { CenterAlignedTopAppBar(title = { Text("HeartBeets") }) },
         snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { padding ->

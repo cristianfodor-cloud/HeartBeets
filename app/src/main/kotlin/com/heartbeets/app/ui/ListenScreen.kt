@@ -36,6 +36,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -56,9 +57,18 @@ fun ListenScreen(
     val error by vm.error.collectAsState()
     val friendName by vm.friendName.collectAsState()
     val friends by vm.friends.collectAsState()
+    val receivedPack by vm.receivedPack.collectAsState()
 
     // If opened via deep link with a code, show add-friend dialog immediately
     var showAddDialogWithCode by remember { mutableStateOf(prefillCode) }
+
+    // Toast for feedback messages (save result, errors)
+    val context = LocalContext.current
+    androidx.compose.runtime.LaunchedEffect(error) {
+        error?.let {
+            android.widget.Toast.makeText(context, it, android.widget.Toast.LENGTH_SHORT).show()
+        }
+    }
 
     Scaffold(
         containerColor = androidx.compose.ui.graphics.Color.Transparent,
@@ -134,6 +144,14 @@ fun ListenScreen(
                     Spacer(Modifier.height(32.dp))
                     OutlinedButton(onClick = { vm.stopListening() }) {
                         Text("Stop Listening")
+                    }
+
+                    // Offer to save the received sound pack
+                    if (receivedPack != null) {
+                        Spacer(Modifier.height(12.dp))
+                        OutlinedButton(onClick = { vm.saveReceivedPack() }) {
+                            Text("Save Sound: ${receivedPack!!.displayName}")
+                        }
                     }
                 }
                 ListenStatus.OFFLINE -> {

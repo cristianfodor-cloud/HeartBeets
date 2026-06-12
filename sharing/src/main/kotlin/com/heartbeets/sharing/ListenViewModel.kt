@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.heartbeets.audio.AudioEngine
 import com.heartbeets.audio.SoundPack
 import com.heartbeets.audio.SoundPackRegistry
+import com.heartbeets.audio.SoundPackRepository
 import com.heartbeets.audio.SynthParams
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -22,6 +23,7 @@ class ListenViewModel(application: Application) : AndroidViewModel(application) 
 
     private val repo = HeartbeatRepository(application)
     private val profileRepo = ProfileSyncRepository()
+    private val soundPackRepo = SoundPackRepository(application)
 
     val audioEngine = AudioEngine(application)
 
@@ -39,6 +41,10 @@ class ListenViewModel(application: Application) : AndroidViewModel(application) 
 
     private val _friendName = MutableStateFlow<String?>(null)
     val friendName: StateFlow<String?> = _friendName.asStateFlow()
+
+    /** The sound pack received from the friend (available to save). */
+    private val _receivedPack = MutableStateFlow<SoundPack?>(null)
+    val receivedPack: StateFlow<SoundPack?> = _receivedPack.asStateFlow()
 
     private var listenJob: Job? = null
 
@@ -122,7 +128,24 @@ class ListenViewModel(application: Application) : AndroidViewModel(application) 
             description = "Received via sharing",
             synthParams = synthParams,
         )
+        _receivedPack.value = pack
         audioEngine.setSoundPack(pack)
+    }
+
+    /**
+     * Save the received sound pack to the user's local collection.
+     */
+    fun saveReceivedPack() {
+        val pack = _receivedPack.value ?: return
+        // Check if already saved
+        if (SoundPackRegistry.getById(pack.id) != null) {
+            _error.value = "Sound pack already saved"
+            return
+        }
+        viewModelScope.launch {
+            soundPackRepo.save(pack)
+            _error.value = "Sound pack \"${pack.displayName}\" saved!"
+        }
     }
 
     private fun startAudio() {
@@ -137,6 +160,7 @@ class ListenViewModel(application: Application) : AndroidViewModel(application) 
         _status.value = ListenStatus.IDLE
         _bpm.value = null
         _friendName.value = null
+        _receivedPack.value = null
     }
 
     override fun onCleared() {

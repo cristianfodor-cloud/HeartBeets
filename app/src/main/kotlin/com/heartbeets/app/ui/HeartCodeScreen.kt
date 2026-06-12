@@ -86,7 +86,8 @@ fun HeartCodeScreen(
         ) {
             Text(
                 "Generate codes and share them with friends. " +
-                    "Enabled codes broadcast your heartbeat when you go live.",
+                    "Enabled codes broadcast your heartbeat when you go live. " +
+                    "You can share the same code to multiple friends.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

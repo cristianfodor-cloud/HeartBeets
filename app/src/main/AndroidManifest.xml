@@ -6,6 +6,9 @@
         android:usesPermissionFlags="neverForLocation" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
 
+    <!-- Network (Firebase, Billing, Auth) -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
     <!-- Foreground service (health type) -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_HEALTH" />

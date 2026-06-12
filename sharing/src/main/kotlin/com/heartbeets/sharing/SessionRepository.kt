@@ -27,6 +27,19 @@ class HeartbeatRepository(private val context: Context) {
         private const val KEY_FRIENDS = "friends" // code|name,...
     }
 
+    // --- Raw access for backup/restore ---
+
+    fun getRawCodes(): String = prefs.getString(KEY_HEART_CODES, "") ?: ""
+    fun getRawFriends(): String = prefs.getString(KEY_FRIENDS, "") ?: ""
+
+    fun restoreRawCodes(raw: String) {
+        prefs.edit().putString(KEY_HEART_CODES, raw).apply()
+    }
+
+    fun restoreRawFriends(raw: String) {
+        prefs.edit().putString(KEY_FRIENDS, raw).apply()
+    }
+
     // --- HeartCodes (user's own codes) ---
 
     fun getHeartCodes(): List<HeartCode> {

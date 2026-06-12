@@ -19,6 +19,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.heartbeets.app.ui.HeartBeetsTheme
 import com.heartbeets.app.ui.HeartCodeScreen
+import com.heartbeets.app.ui.HomeScreen
 import com.heartbeets.app.ui.ListenScreen
 import com.heartbeets.app.ui.LiveHrScreen
 import com.heartbeets.app.ui.ScanScreen
@@ -28,6 +29,8 @@ import com.heartbeets.app.ui.ProfileCreatorViewModelFactory
 import com.heartbeets.app.ui.SoundDesignerScreen
 import com.heartbeets.app.ui.SoundDesignerViewModel
 import com.heartbeets.app.ui.SoundDesignerViewModelFactory
+import com.heartbeets.app.ui.SubscriptionScreen
+import com.heartbeets.app.billing.BillingViewModel
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -51,14 +54,21 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
-                NavHost(nav, startDestination = "scan") {
+                NavHost(nav, startDestination = "home") {
+                    composable("home") {
+                        HomeScreen(
+                            onScanClicked = { nav.navigate("scan") },
+                            onListenClicked = { nav.navigate("listen/none") },
+                            onHeartCodesClicked = { nav.navigate("heartcodes") },
+                            onSubscriptionClicked = { nav.navigate("subscription") },
+                        )
+                    }
                     composable("scan") {
                         ScanScreen(
                             onDeviceSelected = { address, factoryId ->
                                 nav.navigate("live/$address/$factoryId")
                             },
-                            onListenClicked = { nav.navigate("listen/none") },
-                            onHeartCodesClicked = { nav.navigate("heartcodes") },
+                            onBack = { nav.popBackStack() },
                         )
                     }
                     composable(
@@ -136,6 +146,9 @@ class MainActivity : ComponentActivity() {
                             viewModel = vm,
                             onBack = { nav.popBackStack() },
                         )
+                    }
+                    composable("subscription") {
+                        SubscriptionScreen(onBack = { nav.popBackStack() })
                     }
                 }
                 } // Box

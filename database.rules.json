@@ -1,0 +1,10 @@
+{
+  "rules": {
+    "heartbeats": {
+      "$code": {
+        ".read": true,
+        ".write": true
+      }
+    }
+  }
+}

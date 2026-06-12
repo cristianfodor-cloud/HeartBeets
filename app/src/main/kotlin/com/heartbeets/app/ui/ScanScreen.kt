@@ -19,12 +19,16 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
@@ -50,8 +54,7 @@ import com.heartbeets.core.Match
 @Composable
 fun ScanScreen(
     onDeviceSelected: (address: String, factoryId: String) -> Unit,
-    onListenClicked: () -> Unit = {},
-    onHeartCodesClicked: () -> Unit = {},
+    onBack: () -> Unit = {},
     vm: ScanViewModel = viewModel(),
 ) {
     val devices by vm.devices.collectAsState()
@@ -73,9 +76,34 @@ fun ScanScreen(
         if (grants.values.all { it }) vm.startScan(context)
     }
 
+    // Start scanning immediately on entry
+    LaunchedEffect(Unit) {
+        val perms = requiredPermissions()
+        val denied = perms.filter {
+            ContextCompat.checkSelfPermission(context, it) != PackageManager.PERMISSION_GRANTED
+        }
+        if (denied.isEmpty()) vm.startScan(context)
+        else permLauncher.launch(denied.toTypedArray())
+    }
+
     Scaffold(
         containerColor = androidx.compose.ui.graphics.Color.Transparent,
-        topBar = { CenterAlignedTopAppBar(title = { Text("HeartBeets") }) },
+        topBar = {
+            CenterAlignedTopAppBar(
+                title = { Text("Scan for Devices") },
+                navigationIcon = {
+                    IconButton(onClick = {
+                        vm.stopScan()
+                        onBack()
+                    }) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back",
+                        )
+                    }
+                },
+            )
+        },
         snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { padding ->
         Column(
@@ -84,44 +112,21 @@ fun ScanScreen(
                 .padding(padding)
                 .padding(16.dp),
         ) {
-            Button(
-                onClick = {
-                    val perms = requiredPermissions()
-                    val denied = perms.filter {
-                        ContextCompat.checkSelfPermission(context, it) != PackageManager.PERMISSION_GRANTED
-                    }
-                    if (denied.isEmpty()) vm.startScan(context)
-                    else permLauncher.launch(denied.toTypedArray())
-                },
-                modifier = Modifier.fillMaxWidth(),
-                enabled = !scanning,
-            ) {
-                Text(if (scanning) "Scanning…" else "Scan for devices")
+            if (scanning) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    CircularProgressIndicator(modifier = Modifier.padding(end = 12.dp))
+                    Text("Scanning…", style = MaterialTheme.typography.bodyMedium)
+                }
+                Spacer(Modifier.height(16.dp))
             }
 
-            Spacer(Modifier.height(8.dp))
-
-            OutlinedButton(
-                onClick = onListenClicked,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text("Listen to a Heartbeat")
-            }
-
-            Spacer(Modifier.height(8.dp))
-
-            OutlinedButton(
-                onClick = onHeartCodesClicked,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text("My HeartCodes")
-            }
-
-            Spacer(Modifier.height(12.dp))
-
-            if (scanning && devices.isEmpty()) {
+            if (devices.isEmpty() && !scanning) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator()
+                    Text("No devices found. Make sure your wearable is nearby.", style = MaterialTheme.typography.bodyMedium)
                 }
             } else {
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {

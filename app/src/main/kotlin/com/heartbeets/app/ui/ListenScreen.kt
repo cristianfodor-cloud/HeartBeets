@@ -51,6 +51,9 @@ fun ListenScreen(
     onBack: () -> Unit,
     prefillCode: String? = null,
     vm: ListenViewModel = viewModel(),
+    billingVm: com.heartbeets.app.billing.BillingViewModel = viewModel(
+        viewModelStoreOwner = LocalContext.current as androidx.activity.ComponentActivity,
+    ),
 ) {
     val status by vm.status.collectAsState()
     val bpm by vm.bpm.collectAsState()
@@ -97,9 +100,15 @@ fun ListenScreen(
                 ListenStatus.IDLE -> {
                     FriendsListView(
                         friends = friends,
-                        onListen = { vm.listenTo(it) },
-                        onRemove = { vm.removeFriend(it.code) },
-                        onAdd = { code, name -> vm.addFriend(code, name) },
+                        onListen = { friend ->
+                            if (!billingVm.hasAccess) {
+                                android.widget.Toast.makeText(context, "Trial ended — subscribe to listen live", android.widget.Toast.LENGTH_SHORT).show()
+                            } else {
+                                vm.listenTo(friend)
+                            }
+                        },
+                        onRemove = { vm.removeFriend(it.code); billingVm.triggerBackup() },
+                        onAdd = { code, name -> vm.addFriend(code, name); billingVm.triggerBackup() },
                         error = error,
                     )
                 }
@@ -185,6 +194,7 @@ fun ListenScreen(
             onDismiss = { showAddDialogWithCode = null },
             onAdd = { c, name ->
                 vm.addFriend(c, name)
+                billingVm.triggerBackup()
                 showAddDialogWithCode = null
             },
         )

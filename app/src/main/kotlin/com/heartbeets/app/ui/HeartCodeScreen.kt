@@ -58,6 +58,9 @@ fun HeartCodeScreen(
     shareVm: ShareViewModel = viewModel(
         viewModelStoreOwner = LocalContext.current as androidx.activity.ComponentActivity,
     ),
+    billingVm: com.heartbeets.app.billing.BillingViewModel = viewModel(
+        viewModelStoreOwner = LocalContext.current as androidx.activity.ComponentActivity,
+    ),
 ) {
     val codes by shareVm.heartCodes.collectAsState()
     var showCreateDialog by remember { mutableStateOf(false) }
@@ -144,6 +147,7 @@ fun HeartCodeScreen(
             confirmButton = {
                 Button(onClick = {
                     shareVm.deleteCode(code.code)
+                    billingVm.triggerBackup()
                     codeToDelete = null
                 }) { Text("Delete") }
             },
@@ -215,6 +219,7 @@ fun HeartCodeScreen(
             onDismiss = { showCreateDialog = false },
             onCreate = { name ->
                 shareVm.createCode(name)
+                billingVm.triggerBackup()
                 showCreateDialog = false
             },
         )

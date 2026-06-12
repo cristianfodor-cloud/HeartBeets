@@ -88,6 +88,9 @@ fun LiveHrScreen(
     shareVm: ShareViewModel = viewModel(
         viewModelStoreOwner = LocalContext.current as androidx.activity.ComponentActivity,
     ),
+    billingVm: com.heartbeets.app.billing.BillingViewModel = viewModel(
+        viewModelStoreOwner = LocalContext.current as androidx.activity.ComponentActivity,
+    ),
 ) {
     val bpm by vm.bpm.collectAsState()
     val state by vm.connectionState.collectAsState()
@@ -246,6 +249,10 @@ fun LiveHrScreen(
             Spacer(Modifier.height(4.dp))
             if (!isLive) {
                 OutlinedButton(onClick = {
+                    if (!billingVm.hasAccess) {
+                        android.widget.Toast.makeText(toastContext, "Trial ended — subscribe to share live", android.widget.Toast.LENGTH_SHORT).show()
+                        return@OutlinedButton
+                    }
                     if (bpm == null) {
                         android.widget.Toast.makeText(toastContext, "No HR available yet", android.widget.Toast.LENGTH_SHORT).show()
                         return@OutlinedButton

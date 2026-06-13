@@ -117,6 +117,20 @@ class AudioEngine(private val context: Context) {
         activePack = pack
         val pcm = loadPcm(pack)
         scheduler.setSample(pcm)
+        // Configure background layers from pack settings
+        scheduler.setNoise(pack.noiseType, pack.noiseVolume)
+        val carrierHz = if (pack.binauralPreset == BinauralPreset.CUSTOM) {
+            pack.binauralCarrierHz
+        } else {
+            pack.binauralPreset.carrierHz
+        }
+        val beatHz = if (pack.binauralPreset == BinauralPreset.CUSTOM) {
+            pack.binauralBeatHz
+        } else {
+            pack.binauralPreset.beatHz
+        }
+        val binVol = if (pack.binauralPreset == BinauralPreset.NONE) 0f else pack.binauralVolume
+        scheduler.setBinaural(carrierHz, beatHz, binVol)
     }
 
     private fun loadPcm(pack: SoundPack): ShortArray {

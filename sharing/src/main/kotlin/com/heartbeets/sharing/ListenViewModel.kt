@@ -4,6 +4,8 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.heartbeets.audio.AudioEngine
+import com.heartbeets.audio.BinauralPreset
+import com.heartbeets.audio.NoiseType
 import com.heartbeets.audio.SoundPack
 import com.heartbeets.audio.SoundPackRegistry
 import com.heartbeets.audio.SoundPackRepository
@@ -122,11 +124,19 @@ class ListenViewModel(application: Application) : AndroidViewModel(application) 
     private suspend fun loadProfileSound(profileId: String) {
         val profile = if (profileId.isNotBlank()) profileRepo.getProfile(profileId) else null
         val synthParams = profile?.synthParams?.toSynthParams() ?: SynthParams.CLASSIC
+        val noiseType = try { NoiseType.valueOf(profile?.noiseType ?: "NONE") } catch (_: Exception) { NoiseType.NONE }
+        val binauralPreset = try { BinauralPreset.valueOf(profile?.binauralPreset ?: "NONE") } catch (_: Exception) { BinauralPreset.NONE }
         val pack = SoundPack(
             id = "shared_${profileId.ifBlank { "default" }}",
             displayName = profile?.name ?: "Shared",
             description = "Received via sharing",
             synthParams = synthParams,
+            noiseType = noiseType,
+            noiseVolume = (profile?.noiseVolume ?: 0.1).toFloat(),
+            binauralPreset = binauralPreset,
+            binauralCarrierHz = (profile?.binauralCarrierHz ?: 200.0).toFloat(),
+            binauralBeatHz = (profile?.binauralBeatHz ?: 10.0).toFloat(),
+            binauralVolume = (profile?.binauralVolume ?: 0.3).toFloat(),
         )
         _receivedPack.value = pack
         audioEngine.setSoundPack(pack)

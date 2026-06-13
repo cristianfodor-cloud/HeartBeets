@@ -14,12 +14,14 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -61,7 +63,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.heartbeets.audio.PlaybackMode
+import com.heartbeets.audio.BinauralPreset
 import com.heartbeets.audio.HeartbeatProfile
+import com.heartbeets.audio.NoiseType
 import com.heartbeets.audio.ProfileAnchorMode
 import com.heartbeets.audio.SoundPackRegistry
 import com.heartbeets.audio.SynthParams
@@ -76,6 +80,8 @@ fun LiveHrScreen(
     address: String,
     factoryId: String,
     onBack: () -> Unit,
+    savedPackId: String? = null,
+    onSavedPackConsumed: () -> Unit = {},
     onOpenSoundDesigner: (packId: String?) -> Unit = {},
     onOpenProfileCreator: (profileId: String?) -> Unit = {},
     vm: LiveHrViewModel = viewModel(
@@ -115,6 +121,17 @@ fun LiveHrScreen(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
+    // Auto-select saved pack from SoundDesigner
+    androidx.compose.runtime.LaunchedEffect(savedPackId) {
+        if (savedPackId != null) {
+            val pack = com.heartbeets.audio.SoundPackRegistry.getById(savedPackId)
+            if (pack != null) {
+                vm.setSoundPack(pack)
+            }
+            onSavedPackConsumed()
+        }
+    }
+
     // Push BPM to Firebase when live
     val sharingActive by shareVm.isLive.collectAsState()
     androidx.compose.runtime.LaunchedEffect(bpm, sharingActive) {
@@ -127,6 +144,8 @@ fun LiveHrScreen(
     var showSoundPackSheet by remember { mutableStateOf(false) }
     var absoluteBpmDialogProfile by remember { mutableStateOf<HeartbeatProfile?>(null) }
     var absoluteBpmInput by remember { mutableStateOf("") }
+    var confirmDeletePackId by remember { mutableStateOf<String?>(null) }
+    var confirmDeleteProfileId by remember { mutableStateOf<String?>(null) }
 
     Scaffold(
         containerColor = androidx.compose.ui.graphics.Color.Transparent,
@@ -245,6 +264,12 @@ fun LiveHrScreen(
                             version = 1,
                             createdBy = "",
                             synthParams = SynthParamsDto.from(synthParams),
+                            noiseType = (pack?.noiseType ?: NoiseType.NONE).name,
+                            noiseVolume = (pack?.noiseVolume ?: 0.1f).toDouble(),
+                            binauralPreset = (pack?.binauralPreset ?: BinauralPreset.NONE).name,
+                            binauralCarrierHz = (pack?.binauralCarrierHz ?: 200f).toDouble(),
+                            binauralBeatHz = (pack?.binauralBeatHz ?: 10f).toDouble(),
+                            binauralVolume = (pack?.binauralVolume ?: 0.3f).toDouble(),
                         )
                         shareVm.goLive(profile)
                     }) { Text("Go Live") }
@@ -361,7 +386,7 @@ fun LiveHrScreen(
             Column(Modifier.padding(16.dp)) {
                 Text("Select Profile", style = MaterialTheme.typography.titleMedium)
                 Spacer(Modifier.height(12.dp))
-                LazyColumn {
+                LazyColumn(Modifier.weight(1f, fill = false)) {
                     items(profiles) { profile ->
                         Column(
                             modifier = Modifier
@@ -385,7 +410,7 @@ fun LiveHrScreen(
                                     }
                                 }
                                 OutlinedButton(onClick = {
-                                    absoluteBpmInput = (bpm ?: 72).toString()
+                                    absoluteBpmInput = (bpm ?: 60).toString()
                                     absoluteBpmDialogProfile = profile
                                     showProfileSheet = false
                                 }) {
@@ -403,6 +428,16 @@ fun LiveHrScreen(
                                             imageVector = androidx.compose.material.icons.Icons.Filled.Edit,
                                             contentDescription = "Edit profile",
                                             tint = MaterialTheme.colorScheme.primary,
+                                        )
+                                    }
+                                    IconButton(
+                                        onClick = { confirmDeleteProfileId = profile.id },
+                                        modifier = Modifier.size(36.dp),
+                                    ) {
+                                        Icon(
+                                            imageVector = androidx.compose.material.icons.Icons.Filled.Delete,
+                                            contentDescription = "Delete profile",
+                                            tint = MaterialTheme.colorScheme.error,
                                         )
                                     }
                                 }
@@ -449,7 +484,7 @@ fun LiveHrScreen(
             confirmButton = {
                 Button(
                     onClick = {
-                        val startBpm = absoluteBpmInput.toIntOrNull()?.coerceIn(1, 220) ?: 72
+                        val startBpm = absoluteBpmInput.toIntOrNull()?.coerceIn(1, 220) ?: 60
                         val adjusted = profile.copy(
                             anchorMode = ProfileAnchorMode.ABSOLUTE,
                             startBpm = startBpm,
@@ -467,9 +502,56 @@ fun LiveHrScreen(
         )
     }
 
+    // Confirm delete sound pack
+    confirmDeletePackId?.let { packId ->
+        AlertDialog(
+            onDismissRequest = { confirmDeletePackId = null },
+            title = { Text("Delete Sound Pack") },
+            text = { Text("Are you sure you want to delete this sound pack? This cannot be undone.") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        vm.deleteSoundPack(packId)
+                        confirmDeletePackId = null
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                ) { Text("Delete") }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { confirmDeletePackId = null }) {
+                    Text("Cancel")
+                }
+            },
+        )
+    }
+
+    // Confirm delete profile
+    confirmDeleteProfileId?.let { profileId ->
+        AlertDialog(
+            onDismissRequest = { confirmDeleteProfileId = null },
+            title = { Text("Delete Profile") },
+            text = { Text("Are you sure you want to delete this profile? This cannot be undone.") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        vm.deleteProfile(profileId)
+                        confirmDeleteProfileId = null
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                ) { Text("Delete") }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { confirmDeleteProfileId = null }) {
+                    Text("Cancel")
+                }
+            },
+        )
+    }
+
     // Sound pack selection bottom sheet
     if (showSoundPackSheet) {
         val activePackId by vm.activeSoundPackId.collectAsState()
+        val allPacks by vm.soundPacks.collectAsState()
         ModalBottomSheet(
             onDismissRequest = { showSoundPackSheet = false },
             sheetState = rememberModalBottomSheetState(),
@@ -481,7 +563,7 @@ fun LiveHrScreen(
             ) {
                 Text("Select Sound Pack", style = MaterialTheme.typography.titleMedium)
                 Spacer(Modifier.height(12.dp))
-                SoundPackRegistry.getAll().forEach { pack ->
+                allPacks.forEach { pack ->
                     val isSelected = pack.id == activePackId
                     Row(
                         modifier = Modifier
@@ -517,6 +599,32 @@ fun LiveHrScreen(
                                 vm.setSoundPack(pack)
                             }) {
                                 Text("Use")
+                            }
+                        }
+                        if (pack.isUserCreated) {
+                            Spacer(Modifier.width(4.dp))
+                            IconButton(
+                                onClick = {
+                                    showSoundPackSheet = false
+                                    onOpenSoundDesigner(pack.id)
+                                },
+                                modifier = Modifier.size(36.dp),
+                            ) {
+                                Icon(
+                                    imageVector = androidx.compose.material.icons.Icons.Filled.Edit,
+                                    contentDescription = "Edit sound pack",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                )
+                            }
+                            IconButton(
+                                onClick = { confirmDeletePackId = pack.id },
+                                modifier = Modifier.size(36.dp),
+                            ) {
+                                Icon(
+                                    imageVector = androidx.compose.material.icons.Icons.Filled.Delete,
+                                    contentDescription = "Delete sound pack",
+                                    tint = MaterialTheme.colorScheme.error,
+                                )
                             }
                         }
                     }

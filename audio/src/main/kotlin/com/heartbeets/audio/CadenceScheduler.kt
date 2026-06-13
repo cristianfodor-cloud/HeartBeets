@@ -22,6 +22,9 @@ import java.util.concurrent.atomic.AtomicReference
  * into an [AudioTrack] stream continuously. The interval between beats is
  * recalculated whenever [updateBpm] is called; the new tempo takes effect at
  * the start of the next beat cycle.
+ *
+ * Output is stereo. The heartbeat sample is center-panned (duplicated to L/R).
+ * Background noise and binaural beats are mixed in continuously.
  */
 internal class CadenceScheduler {
 
@@ -34,6 +37,21 @@ internal class CadenceScheduler {
 
     /** Tracks whether a phase adjustment was made and needs to be applied on the next beat. */
     private val pendingPhaseAdjustmentSamples = AtomicInteger(0)
+
+    // --- Background layers ---
+    private val noiseGenerator = NoiseGenerator()
+    private val binauralGenerator = BinauralGenerator(sampleRate)
+
+    @Volatile
+    private var noiseType: NoiseType = NoiseType.NONE
+    @Volatile
+    private var noiseVolume: Float = 0f
+    @Volatile
+    private var binauralCarrierHz: Float = 0f
+    @Volatile
+    private var binauralBeatHz: Float = 0f
+    @Volatile
+    private var binauralVolume: Float = 0f
 
     private var audioTrack: AudioTrack? = null
     private var scope: CoroutineScope? = null
@@ -52,6 +70,23 @@ internal class CadenceScheduler {
      */
     fun updateBpm(bpm: Int) {
         currentBpm.set(bpm.coerceIn(1, 220))
+    }
+
+    /**
+     * Configure background noise layer.
+     */
+    fun setNoise(type: NoiseType, volume: Float) {
+        noiseType = type
+        noiseVolume = volume
+    }
+
+    /**
+     * Configure binaural beats layer.
+     */
+    fun setBinaural(carrierHz: Float, beatHz: Float, volume: Float) {
+        binauralCarrierHz = carrierHz
+        binauralBeatHz = beatHz
+        binauralVolume = volume
     }
 
     /**
@@ -81,7 +116,7 @@ internal class CadenceScheduler {
 
         val bufferSize = AudioTrack.getMinBufferSize(
             sampleRate,
-            AudioFormat.CHANNEL_OUT_MONO,
+            AudioFormat.CHANNEL_OUT_STEREO,
             AudioFormat.ENCODING_PCM_16BIT
         )
 
@@ -95,17 +130,19 @@ internal class CadenceScheduler {
             .setAudioFormat(
                 AudioFormat.Builder()
                     .setSampleRate(sampleRate)
-                    .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
+                    .setChannelMask(AudioFormat.CHANNEL_OUT_STEREO)
                     .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
                     .build()
             )
-            .setBufferSizeInBytes(bufferSize.coerceAtLeast(sampleRate * 4)) // ~2s buffer for low BPMs
+            .setBufferSizeInBytes(bufferSize.coerceAtLeast(sampleRate * 8)) // ~2s stereo buffer
             .setTransferMode(AudioTrack.MODE_STREAM)
             .setPerformanceMode(AudioTrack.PERFORMANCE_MODE_NONE)
             .build()
 
         track.play()
         audioTrack = track
+
+        binauralGenerator.reset()
 
         val handler = CoroutineExceptionHandler { _, t ->
             if (t !is CancellationException) {
@@ -137,14 +174,47 @@ internal class CadenceScheduler {
 
     val isPlaying: Boolean get() = job?.isActive == true
 
+    /**
+     * Convert mono heartbeat sample to stereo interleaved (center-panned),
+     * then mix in noise and binaural layers.
+     */
+    private fun buildStereoChunk(monoSamples: ShortArray, offset: Int, length: Int): ShortArray {
+        val stereo = ShortArray(length * 2)
+        // Center-pan: duplicate mono to both channels
+        for (i in 0 until length) {
+            stereo[i * 2] = monoSamples[offset + i]
+            stereo[i * 2 + 1] = monoSamples[offset + i]
+        }
+        // Mix background layers
+        noiseGenerator.fillStereo(stereo, noiseType, noiseVolume)
+        if (binauralVolume > 0f && binauralCarrierHz > 0f) {
+            binauralGenerator.fillStereo(stereo, binauralCarrierHz, binauralBeatHz, binauralVolume)
+        }
+        return stereo
+    }
+
+    /**
+     * Build a stereo silence chunk with noise and binaural mixed in.
+     */
+    private fun buildSilenceStereoChunk(length: Int): ShortArray {
+        val stereo = ShortArray(length * 2) // all zeros = silence
+        // Mix background layers into silence
+        noiseGenerator.fillStereo(stereo, noiseType, noiseVolume)
+        if (binauralVolume > 0f && binauralCarrierHz > 0f) {
+            binauralGenerator.fillStereo(stereo, binauralCarrierHz, binauralBeatHz, binauralVolume)
+        }
+        return stereo
+    }
+
     private fun playbackLoop(track: AudioTrack) {
-        val silence = ShortArray(sampleRate / 2) // 500ms chunks of silence for filling gaps
+        val chunkSamples = sampleRate / 2 // 500ms worth of mono samples per chunk
 
         while (scope?.isActive == true) {
             val sample = pcmBuffer.get()
             if (sample == null || sample.isEmpty()) {
-                // No sample loaded yet — write silence and retry
-                track.write(silence, 0, silence.size)
+                // No sample loaded yet — write silence (with noise/binaural if configured)
+                val chunk = buildSilenceStereoChunk(chunkSamples)
+                track.write(chunk, 0, chunk.size)
                 continue
             }
 
@@ -155,14 +225,16 @@ internal class CadenceScheduler {
             val pendingPhase = pendingPhaseAdjustmentSamples.getAndSet(0)
             val silenceSamples = (intervalSamples + pendingPhase - sample.size).coerceAtLeast(0)
 
-            // Write the heartbeat sound
-            track.write(sample, 0, sample.size)
+            // Write the heartbeat sound (stereo, with noise/binaural mixed in)
+            val heartbeatStereo = buildStereoChunk(sample, 0, sample.size)
+            track.write(heartbeatStereo, 0, heartbeatStereo.size)
 
-            // Fill the rest of the interval with silence
+            // Fill the rest of the interval with silence (+ noise/binaural)
             var remaining = silenceSamples
             while (remaining > 0 && scope?.isActive == true) {
-                val chunkSize = remaining.coerceAtMost(silence.size)
-                track.write(silence, 0, chunkSize)
+                val chunkSize = remaining.coerceAtMost(chunkSamples)
+                val chunk = buildSilenceStereoChunk(chunkSize)
+                track.write(chunk, 0, chunk.size)
                 remaining -= chunkSize
             }
         }

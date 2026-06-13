@@ -25,4 +25,11 @@ class ProfileSyncRepository {
         val doc = collection.document(profileId).get().await()
         return doc.toObject(SharedProfile::class.java)
     }
+
+    /**
+     * Delete a profile from Firestore.
+     */
+    suspend fun deleteProfile(profileId: String) {
+        collection.document(profileId).delete().await()
+    }
 }

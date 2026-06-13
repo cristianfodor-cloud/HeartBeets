@@ -79,5 +79,68 @@ data class SynthParams(
             noiseAmplitude = 0.05f,
             masterGain = 0.95f,
         )
+
+        /** Deep, bassy heartbeat for sleep/relaxation. */
+        val DEEP = SynthParams(
+            lubFrequency = 40f,
+            lubAmplitude = 0.9f,
+            lubDurationMs = 120,
+            lubAttackMs = 8,
+            lubDecayMs = 90,
+            dubFrequency = 55f,
+            dubAmplitude = 0.4f,
+            dubDurationMs = 90,
+            dubAttackMs = 8,
+            dubDecayMs = 70,
+            dubOffsetMs = 200,
+            bodyFrequency = 25f,
+            bodyAmplitude = 0.5f,
+            bodyDurationMs = 150,
+            lowPassHz = 150f,
+            noiseAmplitude = 0.01f,
+            masterGain = 0.8f,
+        )
+
+        /** Quick, light pulse — energetic feel. */
+        val PULSE = SynthParams(
+            lubFrequency = 90f,
+            lubAmplitude = 0.85f,
+            lubDurationMs = 50,
+            lubAttackMs = 3,
+            lubDecayMs = 35,
+            dubFrequency = 130f,
+            dubAmplitude = 0.5f,
+            dubDurationMs = 40,
+            dubAttackMs = 3,
+            dubDecayMs = 28,
+            dubOffsetMs = 110,
+            bodyFrequency = 50f,
+            bodyAmplitude = 0.2f,
+            bodyDurationMs = 60,
+            lowPassHz = 0f,
+            noiseAmplitude = 0.03f,
+            masterGain = 0.9f,
+        )
+
+        /** Warm, womb-like muffled thud. */
+        val WOMB = SynthParams(
+            lubFrequency = 45f,
+            lubAmplitude = 0.7f,
+            lubDurationMs = 140,
+            lubAttackMs = 15,
+            lubDecayMs = 110,
+            dubFrequency = 60f,
+            dubAmplitude = 0.3f,
+            dubDurationMs = 100,
+            dubAttackMs = 12,
+            dubDecayMs = 80,
+            dubOffsetMs = 220,
+            bodyFrequency = 22f,
+            bodyAmplitude = 0.6f,
+            bodyDurationMs = 180,
+            lowPassHz = 120f,
+            noiseAmplitude = 0.0f,
+            masterGain = 0.75f,
+        )
     }
 }

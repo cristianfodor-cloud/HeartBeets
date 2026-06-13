@@ -6,6 +6,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.heartbeets.audio.AudioEngine
+import com.heartbeets.audio.BinauralPreset
+import com.heartbeets.audio.NoiseType
 import com.heartbeets.audio.SoundPack
 import com.heartbeets.audio.SoundPackRegistry
 import com.heartbeets.audio.SoundPackRepository
@@ -33,6 +35,26 @@ class SoundDesignerViewModel(
     private val _description = MutableStateFlow("")
     val description: StateFlow<String> = _description.asStateFlow()
 
+    // Background noise
+    private val _noiseType = MutableStateFlow(NoiseType.NONE)
+    val noiseType: StateFlow<NoiseType> = _noiseType.asStateFlow()
+
+    private val _noiseVolume = MutableStateFlow(0.1f)
+    val noiseVolume: StateFlow<Float> = _noiseVolume.asStateFlow()
+
+    // Binaural beats
+    private val _binauralPreset = MutableStateFlow(BinauralPreset.NONE)
+    val binauralPreset: StateFlow<BinauralPreset> = _binauralPreset.asStateFlow()
+
+    private val _binauralCarrierHz = MutableStateFlow(200f)
+    val binauralCarrierHz: StateFlow<Float> = _binauralCarrierHz.asStateFlow()
+
+    private val _binauralBeatHz = MutableStateFlow(10f)
+    val binauralBeatHz: StateFlow<Float> = _binauralBeatHz.asStateFlow()
+
+    private val _binauralVolume = MutableStateFlow(0.3f)
+    val binauralVolume: StateFlow<Float> = _binauralVolume.asStateFlow()
+
     init {
         // If editing an existing pack, load its name
         editPackId?.let { id ->
@@ -40,6 +62,12 @@ class SoundDesignerViewModel(
                 _name.value = pack.displayName
                 _description.value = pack.description
                 pack.synthParams?.let { _params.value = it }
+                _noiseType.value = pack.noiseType
+                _noiseVolume.value = pack.noiseVolume
+                _binauralPreset.value = pack.binauralPreset
+                _binauralCarrierHz.value = pack.binauralCarrierHz
+                _binauralBeatHz.value = pack.binauralBeatHz
+                _binauralVolume.value = pack.binauralVolume
             }
         }
         // Start preview playback
@@ -59,11 +87,41 @@ class SoundDesignerViewModel(
         _description.value = newDescription
     }
 
+    fun updateNoiseType(type: NoiseType) {
+        _noiseType.value = type
+    }
+
+    fun updateNoiseVolume(volume: Float) {
+        _noiseVolume.value = volume
+    }
+
+    fun updateBinauralPreset(preset: BinauralPreset) {
+        _binauralPreset.value = preset
+        if (preset != BinauralPreset.CUSTOM && preset != BinauralPreset.NONE) {
+            _binauralCarrierHz.value = preset.carrierHz
+            _binauralBeatHz.value = preset.beatHz
+        }
+    }
+
+    fun updateBinauralCarrierHz(hz: Float) {
+        _binauralCarrierHz.value = hz
+        _binauralPreset.value = BinauralPreset.CUSTOM
+    }
+
+    fun updateBinauralBeatHz(hz: Float) {
+        _binauralBeatHz.value = hz
+        _binauralPreset.value = BinauralPreset.CUSTOM
+    }
+
+    fun updateBinauralVolume(volume: Float) {
+        _binauralVolume.value = volume
+    }
+
     fun preview() {
         audioEngine.previewSynthParams(_params.value)
     }
 
-    fun save(onDone: () -> Unit) {
+    fun save(onDone: (packId: String) -> Unit) {
         viewModelScope.launch {
             val id = editPackId ?: repository.newId()
             val pack = SoundPack(
@@ -72,9 +130,15 @@ class SoundDesignerViewModel(
                 description = _description.value.ifBlank { "User-created heartbeat sound." },
                 synthParams = _params.value,
                 isUserCreated = true,
+                noiseType = _noiseType.value,
+                noiseVolume = _noiseVolume.value,
+                binauralPreset = _binauralPreset.value,
+                binauralCarrierHz = _binauralCarrierHz.value,
+                binauralBeatHz = _binauralBeatHz.value,
+                binauralVolume = _binauralVolume.value,
             )
             repository.save(pack)
-            onDone()
+            onDone(id)
         }
     }
 

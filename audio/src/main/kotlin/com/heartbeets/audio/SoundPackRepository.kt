@@ -79,6 +79,14 @@ class SoundPackRepository(context: Context) {
                 put("masterGain", p.masterGain.toDouble())
             })
         }
+        // Background noise
+        put("noiseType", pack.noiseType.name)
+        put("noiseVolume", pack.noiseVolume.toDouble())
+        // Binaural beats
+        put("binauralPreset", pack.binauralPreset.name)
+        put("binauralCarrierHz", pack.binauralCarrierHz.toDouble())
+        put("binauralBeatHz", pack.binauralBeatHz.toDouble())
+        put("binauralVolume", pack.binauralVolume.toDouble())
     }
 
     private fun fromJson(obj: JSONObject): SoundPack {
@@ -110,6 +118,12 @@ class SoundPackRepository(context: Context) {
             description = obj.optString("description", ""),
             synthParams = params,
             isUserCreated = true,
+            noiseType = try { NoiseType.valueOf(obj.optString("noiseType", "NONE")) } catch (_: Exception) { NoiseType.NONE },
+            noiseVolume = obj.optDouble("noiseVolume", 0.1).toFloat(),
+            binauralPreset = try { BinauralPreset.valueOf(obj.optString("binauralPreset", "NONE")) } catch (_: Exception) { BinauralPreset.NONE },
+            binauralCarrierHz = obj.optDouble("binauralCarrierHz", 200.0).toFloat(),
+            binauralBeatHz = obj.optDouble("binauralBeatHz", 10.0).toFloat(),
+            binauralVolume = obj.optDouble("binauralVolume", 0.3).toFloat(),
         )
     }
 }

@@ -1,5 +1,7 @@
 package com.heartbeets.sharing
 
+import com.heartbeets.audio.BinauralPreset
+import com.heartbeets.audio.NoiseType
 import com.heartbeets.audio.SynthParams
 
 /**
@@ -28,6 +30,13 @@ data class SharedProfile(
     val version: Int = 1,
     val createdBy: String = "",
     val synthParams: SynthParamsDto = SynthParamsDto(),
+    // Background noise & binaural
+    val noiseType: String = "NONE",
+    val noiseVolume: Double = 0.1,
+    val binauralPreset: String = "NONE",
+    val binauralCarrierHz: Double = 200.0,
+    val binauralBeatHz: Double = 10.0,
+    val binauralVolume: Double = 0.3,
 )
 
 /**

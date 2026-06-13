@@ -11,6 +11,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.heartbeets.audio.BinauralPreset
+import com.heartbeets.audio.NoiseType
 import com.heartbeets.audio.SynthParams
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -18,10 +20,17 @@ import com.heartbeets.audio.SynthParams
 fun SoundDesignerScreen(
     viewModel: SoundDesignerViewModel,
     onBack: () -> Unit,
+    onSaved: (packId: String) -> Unit = {},
 ) {
     val params by viewModel.params.collectAsState()
     val name by viewModel.name.collectAsState()
     val description by viewModel.description.collectAsState()
+    val noiseType by viewModel.noiseType.collectAsState()
+    val noiseVolume by viewModel.noiseVolume.collectAsState()
+    val binauralPreset by viewModel.binauralPreset.collectAsState()
+    val binauralCarrierHz by viewModel.binauralCarrierHz.collectAsState()
+    val binauralBeatHz by viewModel.binauralBeatHz.collectAsState()
+    val binauralVolume by viewModel.binauralVolume.collectAsState()
 
     Scaffold(
         containerColor = androidx.compose.ui.graphics.Color.Transparent,
@@ -60,7 +69,7 @@ fun SoundDesignerScreen(
                             modifier = Modifier.weight(1f),
                         ) { Text("Cancel") }
                         Button(
-                            onClick = { viewModel.save { onBack() } },
+                            onClick = { viewModel.save { packId -> onSaved(packId); onBack() } },
                             modifier = Modifier.weight(1f),
                         ) { Text("Save") }
                     }
@@ -171,6 +180,61 @@ fun SoundDesignerScreen(
             }
             ParamSlider("Master Gain", params.masterGain, 0.1f, 1.5f) {
                 viewModel.updateParams(params.copy(masterGain = it))
+            }
+
+            HorizontalDivider()
+
+            // --- Background Noise ---
+            SectionHeader("Background Noise")
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                NoiseType.entries.forEach { type ->
+                    FilterChip(
+                        selected = noiseType == type,
+                        onClick = { viewModel.updateNoiseType(type) },
+                        label = { Text(type.name.lowercase().replaceFirstChar { it.uppercase() }) },
+                    )
+                }
+            }
+            if (noiseType != NoiseType.NONE) {
+                ParamSlider("Volume", noiseVolume, 0f, 1f) {
+                    viewModel.updateNoiseVolume(it)
+                }
+            }
+
+            HorizontalDivider()
+
+            // --- Binaural Beats ---
+            SectionHeader("Binaural Beats")
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                BinauralPreset.entries.filter { it != BinauralPreset.CUSTOM }.forEach { preset ->
+                    FilterChip(
+                        selected = binauralPreset == preset ||
+                            (preset == BinauralPreset.NONE && binauralPreset == BinauralPreset.NONE),
+                        onClick = { viewModel.updateBinauralPreset(preset) },
+                        label = { Text(preset.name.lowercase().replaceFirstChar { it.uppercase() }) },
+                    )
+                }
+            }
+            if (binauralPreset != BinauralPreset.NONE) {
+                ParamSlider("Carrier (Hz)", binauralCarrierHz, 80f, 500f) {
+                    viewModel.updateBinauralCarrierHz(it)
+                }
+                ParamSlider("Beat (Hz)", binauralBeatHz, 0.5f, 40f) {
+                    viewModel.updateBinauralBeatHz(it)
+                }
+                ParamSlider("Volume", binauralVolume, 0f, 1f) {
+                    viewModel.updateBinauralVolume(it)
+                }
+                if (binauralPreset == BinauralPreset.CUSTOM) {
+                    Text(
+                        "Custom — adjust carrier & beat freely",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
 
             Spacer(Modifier.height(16.dp))

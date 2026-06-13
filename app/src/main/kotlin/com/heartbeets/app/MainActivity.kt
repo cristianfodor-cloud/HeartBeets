@@ -94,10 +94,14 @@ class MainActivity : ComponentActivity() {
                             navArgument("factoryId") { type = NavType.StringType },
                         ),
                     ) { backstack ->
+                        // Auto-select pack saved from SoundDesigner
+                        val savedPackId = backstack.savedStateHandle.get<String>("saved_pack_id")
                         LiveHrScreen(
                             address = backstack.arguments!!.getString("address")!!,
                             factoryId = backstack.arguments!!.getString("factoryId")!!,
                             onBack = { nav.popBackStack() },
+                            savedPackId = savedPackId,
+                            onSavedPackConsumed = { backstack.savedStateHandle.remove<String>("saved_pack_id") },
                             onOpenSoundDesigner = { packId ->
                                 if (packId != null) {
                                     nav.navigate("sound_designer/$packId")
@@ -127,6 +131,9 @@ class MainActivity : ComponentActivity() {
                         SoundDesignerScreen(
                             viewModel = vm,
                             onBack = { nav.popBackStack() },
+                            onSaved = { packId ->
+                                nav.previousBackStackEntry?.savedStateHandle?.set("saved_pack_id", packId)
+                            },
                         )
                     }
                     composable(

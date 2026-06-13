@@ -114,7 +114,10 @@ class LiveHrViewModel(
         }
         connect()
         loadProfiles()
-        viewModelScope.launch { soundPackRepository.loadAndRegister() }
+        viewModelScope.launch {
+            soundPackRepository.loadAndRegister()
+            _soundPacks.value = SoundPackRegistry.getAll()
+        }
     }
 
     fun connect() {
@@ -157,9 +160,13 @@ class LiveHrViewModel(
     private val _activeSoundPackId = MutableStateFlow(SoundPackRegistry.getDefault().id)
     val activeSoundPackId: StateFlow<String> = _activeSoundPackId.asStateFlow()
 
+    private val _soundPacks = MutableStateFlow(SoundPackRegistry.getAll())
+    val soundPacks: StateFlow<List<SoundPack>> = _soundPacks.asStateFlow()
+
     fun setSoundPack(pack: SoundPack) {
         audioEngine.setSoundPack(pack)
         _activeSoundPackId.value = pack.id
+        _soundPacks.value = SoundPackRegistry.getAll()
     }
 
     fun previewPack(pack: SoundPack) {
@@ -186,6 +193,26 @@ class LiveHrViewModel(
 
     fun refreshProfiles() {
         loadProfiles()
+    }
+
+    fun deleteProfile(id: String) {
+        viewModelScope.launch {
+            profileRepository.delete(id)
+            loadProfiles()
+        }
+    }
+
+    fun deleteSoundPack(id: String) {
+        viewModelScope.launch {
+            soundPackRepository.delete(id)
+            // If deleted pack was active, reset to default
+            if (_activeSoundPackId.value == id) {
+                val defaultPack = SoundPackRegistry.getDefault()
+                audioEngine.setSoundPack(defaultPack)
+                _activeSoundPackId.value = defaultPack.id
+            }
+            _soundPacks.value = SoundPackRegistry.getAll()
+        }
     }
 
     private fun loadProfiles() {

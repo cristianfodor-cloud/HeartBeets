@@ -145,6 +145,66 @@ class ProfileRepository(context: Context) {
                     ProfileStage(targetOffsetBpm = 0, durationSec = 300),
                 )
             ),
+            HeartbeatProfile(
+                id = "preset-deep-sleep",
+                name = "Deep Sleep",
+                description = "Slow descent to 55 BPM over 20 min. Pair with Deep Sleep sound pack.",
+                isPreset = true,
+                stages = listOf(
+                    ProfileStage(targetOffsetBpm = 0, durationSec = 120),
+                    ProfileStage(targetOffsetBpm = -3, durationSec = 180, curve = EasingCurve.EASE_OUT),
+                    ProfileStage(targetOffsetBpm = -6, durationSec = 300, curve = EasingCurve.EASE_OUT),
+                    ProfileStage(targetOffsetBpm = -10, durationSec = 600, curve = EasingCurve.EASE_OUT),
+                )
+            ),
+            HeartbeatProfile(
+                id = "preset-meditation",
+                name = "Meditation",
+                description = "Gentle 10 min hold at 60 BPM. Pair with Meditation sound pack.",
+                isPreset = true,
+                stages = listOf(
+                    ProfileStage(targetOffsetBpm = 0, durationSec = 600),
+                )
+            ),
+            HeartbeatProfile(
+                id = "preset-focus-session",
+                name = "Focus Session",
+                description = "25 min steady at your pace. Pair with Focus sound pack for alpha waves.",
+                isPreset = true,
+                stages = listOf(
+                    ProfileStage(targetOffsetBpm = 0, durationSec = 1500),
+                )
+            ),
+            HeartbeatProfile(
+                id = "preset-nap",
+                name = "Power Nap",
+                description = "Slow down over 5 min, hold low for 15 min, then gently ramp back up.",
+                isPreset = true,
+                stages = listOf(
+                    ProfileStage(targetOffsetBpm = 0, durationSec = 60),
+                    ProfileStage(targetOffsetBpm = -8, durationSec = 240, curve = EasingCurve.EASE_OUT),
+                    ProfileStage(targetOffsetBpm = -8, durationSec = 900),
+                    ProfileStage(targetOffsetBpm = 0, durationSec = 120, curve = EasingCurve.EASE_IN),
+                )
+            ),
+            HeartbeatProfile(
+                id = "preset-breathwork",
+                name = "Breathwork",
+                description = "Oscillates tempo ±5 BPM every 30s to pace breathing.",
+                isPreset = true,
+                stages = listOf(
+                    ProfileStage(targetOffsetBpm = -5, durationSec = 30, curve = EasingCurve.EASE_IN_OUT),
+                    ProfileStage(targetOffsetBpm = 5, durationSec = 30, curve = EasingCurve.EASE_IN_OUT),
+                    ProfileStage(targetOffsetBpm = -5, durationSec = 30, curve = EasingCurve.EASE_IN_OUT),
+                    ProfileStage(targetOffsetBpm = 5, durationSec = 30, curve = EasingCurve.EASE_IN_OUT),
+                    ProfileStage(targetOffsetBpm = -5, durationSec = 30, curve = EasingCurve.EASE_IN_OUT),
+                    ProfileStage(targetOffsetBpm = 5, durationSec = 30, curve = EasingCurve.EASE_IN_OUT),
+                    ProfileStage(targetOffsetBpm = -5, durationSec = 30, curve = EasingCurve.EASE_IN_OUT),
+                    ProfileStage(targetOffsetBpm = 5, durationSec = 30, curve = EasingCurve.EASE_IN_OUT),
+                    ProfileStage(targetOffsetBpm = -5, durationSec = 30, curve = EasingCurve.EASE_IN_OUT),
+                    ProfileStage(targetOffsetBpm = 0, durationSec = 30, curve = EasingCurve.EASE_OUT),
+                )
+            ),
         )
     }
 }

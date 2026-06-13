@@ -12,4 +12,12 @@ data class SoundPack(
     val description: String,
     val synthParams: SynthParams? = null,
     val isUserCreated: Boolean = false,
+    // Background noise
+    val noiseType: NoiseType = NoiseType.NONE,
+    val noiseVolume: Float = 0.1f,
+    // Binaural beats
+    val binauralPreset: BinauralPreset = BinauralPreset.NONE,
+    val binauralCarrierHz: Float = 200f,
+    val binauralBeatHz: Float = 10f,
+    val binauralVolume: Float = 0.3f,
 )

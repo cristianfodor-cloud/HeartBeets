@@ -92,6 +92,7 @@ fun LiveHrScreen(
         viewModelStoreOwner = LocalContext.current as androidx.activity.ComponentActivity,
     ),
 ) {
+    val offlineMode = address == "offline"
     val bpm by vm.bpm.collectAsState()
     val state by vm.connectionState.collectAsState()
     val battery by vm.battery.collectAsState()
@@ -131,10 +132,10 @@ fun LiveHrScreen(
         containerColor = androidx.compose.ui.graphics.Color.Transparent,
         topBar = {
             CenterAlignedTopAppBar(
-                title = { Text(vm.displayName) },
+                title = { Text(if (offlineMode) "Offline Mode" else vm.displayName) },
                 navigationIcon = {
                     IconButton(onClick = {
-                        vm.disconnect()
+                        if (!offlineMode) vm.disconnect()
                         onBack()
                     }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
@@ -152,6 +153,7 @@ fun LiveHrScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             // --- Connection status (fixed height so layout doesn't jump) ---
+            if (!offlineMode) {
             Box(
                 modifier = Modifier.height(24.dp),
                 contentAlignment = Alignment.Center,
@@ -288,6 +290,7 @@ fun LiveHrScreen(
                     Button(onClick = { vm.connect() }) { Text("Reconnect") }
                 }
             }
+            } // end if (!offlineMode)
 
             // --- Audio controls ---
             Spacer(Modifier.height(8.dp))
@@ -313,8 +316,10 @@ fun LiveHrScreen(
             ) {
                 when (playbackMode) {
                     PlaybackMode.STOPPED -> {
-                        FilledTonalButton(onClick = { vm.startMirrorMode() }) {
-                            Text("Mirror BPM")
+                        if (!offlineMode) {
+                            FilledTonalButton(onClick = { vm.startMirrorMode() }) {
+                                Text("Mirror BPM")
+                            }
                         }
                         OutlinedButton(onClick = { showProfileSheet = true }) {
                             Text("Profiles")
@@ -454,11 +459,13 @@ fun LiveHrScreen(
                             )
                             Spacer(Modifier.height(8.dp))
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                FilledTonalButton(onClick = {
-                                    vm.startProfile(profile, ProfileAnchorMode.RELATIVE)
-                                    showProfileSheet = false
-                                }) {
-                                    Text("From my BPM")
+                                if (!offlineMode) {
+                                    FilledTonalButton(onClick = {
+                                        vm.startProfile(profile, ProfileAnchorMode.RELATIVE)
+                                        showProfileSheet = false
+                                    }) {
+                                        Text("From my BPM")
+                                    }
                                 }
                                 OutlinedButton(onClick = {
                                     absoluteBpmInput = (bpm ?: 72).toString()

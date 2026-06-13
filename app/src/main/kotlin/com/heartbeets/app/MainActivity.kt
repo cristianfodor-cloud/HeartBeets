@@ -61,6 +61,7 @@ class MainActivity : ComponentActivity() {
                             onListenClicked = { nav.navigate("listen/none") },
                             onHeartCodesClicked = { nav.navigate("heartcodes") },
                             onSubscriptionClicked = { nav.navigate("subscription") },
+                            onOfflineModeClicked = { nav.navigate("live/offline/offline") },
                         )
                     }
                     composable("scan") {

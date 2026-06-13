@@ -23,6 +23,7 @@ fun HomeScreen(
     onListenClicked: () -> Unit = {},
     onHeartCodesClicked: () -> Unit = {},
     onSubscriptionClicked: () -> Unit = {},
+    onOfflineModeClicked: () -> Unit = {},
 ) {
     Scaffold(
         containerColor = androidx.compose.ui.graphics.Color.Transparent,
@@ -41,6 +42,15 @@ fun HomeScreen(
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Text("Scan for devices")
+            }
+
+            Spacer(Modifier.height(8.dp))
+
+            OutlinedButton(
+                onClick = onOfflineModeClicked,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text("Offline Mode")
             }
 
             Spacer(Modifier.height(8.dp))

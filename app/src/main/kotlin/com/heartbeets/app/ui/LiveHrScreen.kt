@@ -148,16 +148,12 @@ fun LiveHrScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(horizontal = 32.dp, vertical = 16.dp),
-            verticalArrangement = Arrangement.Top,
+                .padding(horizontal = 32.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            // --- Connection status (fixed height so layout doesn't jump) ---
             if (!offlineMode) {
-            Box(
-                modifier = Modifier.height(24.dp),
-                contentAlignment = Alignment.Center,
-            ) {
+            // 1. Connection status — fixed 24dp slot
+            Box(modifier = Modifier.height(24.dp), contentAlignment = Alignment.Center) {
                 val statusText = when (state) {
                     ConnectionState.Connecting -> "Connecting…"
                     ConnectionState.Connected -> ""
@@ -165,180 +161,50 @@ fun LiveHrScreen(
                     ConnectionState.Error -> "Error"
                 }
                 if (statusText.isNotEmpty()) {
-                    Text(
-                        text = statusText,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.secondary,
-                    )
+                    Text(statusText, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.secondary)
                 }
             }
 
-            Spacer(Modifier.height(12.dp))
-
-            // --- BPM display (fixed height so it doesn't push content around) ---
-            Box(
-                modifier = Modifier.height(130.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                if (bpm != null) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        // Live indicator
-                        val pulse by remember(lastUpdatedMs) { derivedStateOf { lastUpdatedMs % 2L == 0L } }
-                        val dotAlpha by animateFloatAsState(
-                            targetValue = if (pulse) 1f else 0.2f,
-                            animationSpec = tween(durationMillis = 400),
-                            label = "liveDot",
-                        )
-                        Box(
-                            modifier = Modifier
-                                .padding(bottom = 4.dp)
-                                .alpha(dotAlpha)
-                                .background(Color(0xFFE53935), CircleShape)
-                                .padding(5.dp),
-                        ) {}
-                        Text(
-                            text = "$bpm",
-                            fontSize = 96.sp,
-                            color = MaterialTheme.colorScheme.primary,
-                        )
-                        Text("BPM", style = MaterialTheme.typography.headlineSmall)
-                    }
-                } else if (state == ConnectionState.Connected) {
-                    Text("Waiting for data…", style = MaterialTheme.typography.bodyMedium)
-                }
-            }
-
-            // --- Battery ---
-            Box(
-                modifier = Modifier.height(20.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                battery?.let { pct ->
-                    Text("Battery: $pct %", style = MaterialTheme.typography.bodySmall)
-                }
-            }
-
-            // --- Smoothing toggle ---
-            val smoothing by vm.smoothingEnabled.collectAsState()
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.padding(vertical = 4.dp),
-            ) {
-                RadioButton(
-                    selected = smoothing,
-                    onClick = { vm.toggleSmoothing() },
-                )
-                Text(
-                    text = "Smooth BPM (avg last 10)",
-                    style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.padding(start = 4.dp),
-                )
-            }
-
-            // --- Live Sharing ---
-            val isLive by shareVm.isLive.collectAsState()
-            val shareError by shareVm.error.collectAsState()
-
-            // Show error toast
-            val toastContext = LocalContext.current
-            androidx.compose.runtime.LaunchedEffect(shareError) {
-                shareError?.let {
-                    android.widget.Toast.makeText(toastContext, it, android.widget.Toast.LENGTH_SHORT).show()
-                    shareVm.clearError()
-                }
-            }
-
-            Spacer(Modifier.height(4.dp))
-            if (!isLive) {
-                OutlinedButton(onClick = {
-                    if (!billingVm.hasAccess) {
-                        android.widget.Toast.makeText(toastContext, "Trial ended — subscribe to share live", android.widget.Toast.LENGTH_SHORT).show()
-                        return@OutlinedButton
-                    }
-                    if (bpm == null) {
-                        android.widget.Toast.makeText(toastContext, "No HR available yet", android.widget.Toast.LENGTH_SHORT).show()
-                        return@OutlinedButton
-                    }
-                    val packId = vm.activeSoundPackId.value
-                    val pack = SoundPackRegistry.getById(packId)
-                    val synthParams = pack?.synthParams ?: SynthParams.CLASSIC
-                    val profile = SharedProfile(
-                        id = packId,
-                        name = pack?.displayName ?: "Heartbeat",
-                        version = 1,
-                        createdBy = "",
-                        synthParams = SynthParamsDto.from(synthParams),
-                    )
-                    shareVm.goLive(profile)
-                }) {
-                    Text("Go Live")
-                }
-            } else {
-                Button(onClick = { shareVm.goOffline() }) {
-                    Text("\u2764 LIVE — Tap to stop")
-                }
-            }
-
-            Spacer(Modifier.height(8.dp))
-
-            // --- Reconnect (fixed height slot) ---
-            Box(
-                modifier = Modifier.height(40.dp),
-                contentAlignment = Alignment.Center,
-            ) {
+            // 2. Reconnect — fixed 40dp slot
+            Box(modifier = Modifier.height(40.dp), contentAlignment = Alignment.Center) {
                 if (state == ConnectionState.Disconnected || state == ConnectionState.Error) {
                     Button(onClick = { vm.connect() }) { Text("Reconnect") }
                 }
             }
-            } // end if (!offlineMode)
+            } else {
+            // Offline: match the 64dp taken by connection status + reconnect in live mode
+            Spacer(Modifier.height(64.dp))
+            }
 
-            // --- Audio controls ---
-            Spacer(Modifier.height(8.dp))
-
-            // Playback status (fixed slot)
-            Box(
-                modifier = Modifier.height(24.dp),
-                contentAlignment = Alignment.Center,
-            ) {
+            // 3. Playback status — fixed 24dp slot
+            Box(modifier = Modifier.height(24.dp), contentAlignment = Alignment.Center) {
                 if (playbackMode != PlaybackMode.STOPPED) {
-                    Text(
-                        text = "♫ Playing at $cadence BPM",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.tertiary,
-                    )
+                    Text("♫ Playing at $cadence BPM", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.tertiary)
                 }
             }
 
-            Spacer(Modifier.height(8.dp))
-
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
+            // 4. Audio buttons row — always present
+            Spacer(Modifier.height(4.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 when (playbackMode) {
                     PlaybackMode.STOPPED -> {
                         if (!offlineMode) {
-                            FilledTonalButton(onClick = { vm.startMirrorMode() }) {
-                                Text("Mirror BPM")
-                            }
+                            FilledTonalButton(onClick = { vm.startMirrorMode() }) { Text("Mirror BPM") }
                         }
-                        OutlinedButton(onClick = { showProfileSheet = true }) {
-                            Text("Profiles")
-                        }
+                        OutlinedButton(onClick = { showProfileSheet = true }) { Text("Profiles") }
                     }
                     PlaybackMode.MIRROR, PlaybackMode.PROFILE -> {
-                        Button(onClick = { vm.stopAudio() }) {
-                            Text("Stop")
-                        }
+                        Button(onClick = { vm.stopAudio() }) { Text("Stop") }
                         val activeProfileName by vm.activeProfileName.collectAsState()
                         OutlinedButton(onClick = { showProfileSheet = true }) {
-                            val label = activeProfileName?.let { "Profile: $it" } ?: "Profiles"
-                            Text(label)
+                            Text(activeProfileName?.let { "Profile: $it" } ?: "Profiles")
                         }
                     }
                 }
             }
 
-            Spacer(Modifier.height(8.dp))
+            // 5. Sound Packs — always present
+            Spacer(Modifier.height(4.dp))
             val activePackId by vm.activeSoundPackId.collectAsState()
             val activePackName = remember(activePackId) {
                 SoundPackRegistry.getById(activePackId)?.displayName ?: "Classic"
@@ -347,91 +213,142 @@ fun LiveHrScreen(
                 Text("Sound Packs: $activePackName")
             }
 
-            // --- D-pad: phase (left/right) and BPM offset (up/down) ---
-            if (playbackMode != PlaybackMode.STOPPED) {
-                Spacer(Modifier.height(16.dp))
-
-                // Offset labels (fixed slot)
-                Box(
-                    modifier = Modifier.height(20.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    if (bpmOffset != 0 || phaseOffset != 0) {
-                        Text(
-                            text = "BPM offset: ${if (bpmOffset >= 0) "+" else ""}$bpmOffset | " +
-                                    "Phase: ${if (phaseOffset >= 0) "+" else ""}${phaseOffset}ms",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
+            // 6. Go Live — always present, fixed height slot
+            if (!offlineMode) {
+            val isLive by shareVm.isLive.collectAsState()
+            val shareError by shareVm.error.collectAsState()
+            val toastContext = LocalContext.current
+            androidx.compose.runtime.LaunchedEffect(shareError) {
+                shareError?.let {
+                    android.widget.Toast.makeText(toastContext, it, android.widget.Toast.LENGTH_SHORT).show()
+                    shareVm.clearError()
                 }
-
-                Spacer(Modifier.weight(1f))
-
-                // D-pad layout
-                val iconSize = 48.dp
-                val gap = 16.dp
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    // Up arrow: +1 BPM offset
-                    IconButton(
-                        onClick = { vm.adjustBpmOffset(1) },
-                        modifier = Modifier.size(iconSize),
-                    ) {
-                        Icon(
-                            Icons.Filled.KeyboardArrowUp,
-                            contentDescription = "BPM +1",
-                            modifier = Modifier.size(40.dp),
-                        )
-                    }
-                    Spacer(Modifier.height(gap))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        // Left arrow: -50ms phase (advance beat)
-                        IconButton(
-                            onClick = { vm.adjustPhase(-50) },
-                            modifier = Modifier.size(iconSize),
-                        ) {
-                            Icon(
-                                Icons.Filled.KeyboardArrowLeft,
-                                contentDescription = "Phase -50ms",
-                                modifier = Modifier.size(40.dp),
-                            )
-                        }
-                        Spacer(Modifier.width(20.dp))
-                        // Center: reset button
-                        OutlinedButton(
-                            onClick = { vm.resetAdjustments() },
-                            modifier = Modifier.height(iconSize),
-                        ) {
-                            Text("Reset")
-                        }
-                        Spacer(Modifier.width(20.dp))
-                        // Right arrow: +50ms phase (delay beat)
-                        IconButton(
-                            onClick = { vm.adjustPhase(50) },
-                            modifier = Modifier.size(iconSize),
-                        ) {
-                            Icon(
-                                Icons.Filled.KeyboardArrowRight,
-                                contentDescription = "Phase +50ms",
-                                modifier = Modifier.size(40.dp),
-                            )
-                        }
-                    }
-                    Spacer(Modifier.height(gap))
-                    // Down arrow: -1 BPM offset
-                    IconButton(
-                        onClick = { vm.adjustBpmOffset(-1) },
-                        modifier = Modifier.size(iconSize),
-                    ) {
-                        Icon(
-                            Icons.Filled.KeyboardArrowDown,
-                            contentDescription = "BPM -1",
-                            modifier = Modifier.size(40.dp),
-                        )
-                    }
-                }
-                Spacer(Modifier.height(32.dp))
             }
+            Spacer(Modifier.height(4.dp))
+            Box(modifier = Modifier.height(40.dp), contentAlignment = Alignment.Center) {
+                if (!isLive) {
+                    OutlinedButton(onClick = {
+                        if (!billingVm.hasAccess) {
+                            android.widget.Toast.makeText(toastContext, "Trial ended — subscribe to share live", android.widget.Toast.LENGTH_SHORT).show()
+                            return@OutlinedButton
+                        }
+                        if (bpm == null) {
+                            android.widget.Toast.makeText(toastContext, "No HR available yet", android.widget.Toast.LENGTH_SHORT).show()
+                            return@OutlinedButton
+                        }
+                        val packId = vm.activeSoundPackId.value
+                        val pack = SoundPackRegistry.getById(packId)
+                        val synthParams = pack?.synthParams ?: SynthParams.CLASSIC
+                        val profile = SharedProfile(
+                            id = packId,
+                            name = pack?.displayName ?: "Heartbeat",
+                            version = 1,
+                            createdBy = "",
+                            synthParams = SynthParamsDto.from(synthParams),
+                        )
+                        shareVm.goLive(profile)
+                    }) { Text("Go Live") }
+                } else {
+                    Button(onClick = { shareVm.goOffline() }) { Text("\u2764 LIVE — Tap to stop") }
+                }
+            }
+
+            // 7. Top spacer — pushes BPM toward center
+            Spacer(Modifier.weight(0.2f))
+
+            // 8. BPM display — ALWAYS same height, shows "--" when no data
+            Box(modifier = Modifier.height(160.dp), contentAlignment = Alignment.Center) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    val pulse by remember(lastUpdatedMs) { derivedStateOf { lastUpdatedMs % 2L == 0L } }
+                    val dotAlpha by animateFloatAsState(
+                        targetValue = if (bpm != null && pulse) 1f else 0.2f,
+                        animationSpec = tween(durationMillis = 400),
+                        label = "liveDot",
+                    )
+                    Box(
+                        modifier = Modifier
+                            .padding(bottom = 4.dp)
+                            .alpha(dotAlpha)
+                            .background(Color(0xFFE53935), CircleShape)
+                            .padding(5.dp),
+                    ) {}
+                    Text(
+                        text = bpm?.toString() ?: "--",
+                        fontSize = 96.sp,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                    if (bpm == null) {
+                        Text("Waiting for data…", style = MaterialTheme.typography.bodyMedium)
+                    }
+                }
+            }
+
+            // 9. Spacer between BPM and battery/smoothing
+            Spacer(Modifier.weight(0.12f))
+
+            // 10. Battery — fixed 20dp slot
+            Box(modifier = Modifier.height(20.dp), contentAlignment = Alignment.Center) {
+                battery?.let { pct ->
+                    Text("Battery: $pct %", style = MaterialTheme.typography.bodySmall)
+                }
+            }
+
+            // 11. Smoothing — fixed height
+            val smoothing by vm.smoothingEnabled.collectAsState()
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.height(36.dp),
+            ) {
+                RadioButton(selected = smoothing, onClick = { vm.toggleSmoothing() })
+                Text("Smooth BPM (avg last 10)", style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(start = 4.dp))
+            }
+
+            } // end if (!offlineMode) for live section
+
+            // D-pad — visible in both live and offline mode, dimmed when stopped
+            Spacer(Modifier.weight(0.1f))
+
+            Box(modifier = Modifier.height(20.dp), contentAlignment = Alignment.Center) {
+                if (bpmOffset != 0 || phaseOffset != 0) {
+                    Text(
+                        text = "BPM offset: ${if (bpmOffset >= 0) "+" else ""}$bpmOffset | Phase: ${if (phaseOffset >= 0) "+" else ""}${phaseOffset}ms",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+
+            val dpadEnabled = playbackMode != PlaybackMode.STOPPED
+            val dpadAlpha = if (dpadEnabled) 1f else 0.3f
+            val iconSize = 40.dp
+            Column(
+                modifier = Modifier.alpha(dpadAlpha),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                IconButton(onClick = { vm.adjustBpmOffset(1) }, enabled = dpadEnabled, modifier = Modifier.size(iconSize)) {
+                    Icon(Icons.Filled.KeyboardArrowUp, contentDescription = "BPM +1", modifier = Modifier.size(36.dp))
+                }
+                Spacer(Modifier.height(12.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = { vm.adjustPhase(-50) }, enabled = dpadEnabled, modifier = Modifier.size(iconSize)) {
+                        Icon(Icons.Filled.KeyboardArrowLeft, contentDescription = "Phase -50ms", modifier = Modifier.size(36.dp))
+                    }
+                    Spacer(Modifier.width(16.dp))
+                    OutlinedButton(onClick = { vm.resetAdjustments() }, enabled = dpadEnabled, modifier = Modifier.height(iconSize)) {
+                        Text("Reset")
+                    }
+                    Spacer(Modifier.width(16.dp))
+                    IconButton(onClick = { vm.adjustPhase(50) }, enabled = dpadEnabled, modifier = Modifier.size(iconSize)) {
+                        Icon(Icons.Filled.KeyboardArrowRight, contentDescription = "Phase +50ms", modifier = Modifier.size(36.dp))
+                    }
+                }
+                Spacer(Modifier.height(12.dp))
+                IconButton(onClick = { vm.adjustBpmOffset(-1) }, enabled = dpadEnabled, modifier = Modifier.size(iconSize)) {
+                    Icon(Icons.Filled.KeyboardArrowDown, contentDescription = "BPM -1", modifier = Modifier.size(36.dp))
+                }
+            }
+
+            Spacer(Modifier.height(32.dp))
         }
     }
 

@@ -99,9 +99,9 @@ internal class CadenceScheduler {
                     .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
                     .build()
             )
-            .setBufferSizeInBytes(bufferSize.coerceAtLeast(sampleRate * 2)) // ~1s buffer
+            .setBufferSizeInBytes(bufferSize.coerceAtLeast(sampleRate * 4)) // ~2s buffer for low BPMs
             .setTransferMode(AudioTrack.MODE_STREAM)
-            .setPerformanceMode(AudioTrack.PERFORMANCE_MODE_LOW_LATENCY)
+            .setPerformanceMode(AudioTrack.PERFORMANCE_MODE_NONE)
             .build()
 
         track.play()
@@ -138,7 +138,7 @@ internal class CadenceScheduler {
     val isPlaying: Boolean get() = job?.isActive == true
 
     private fun playbackLoop(track: AudioTrack) {
-        val silence = ShortArray(sampleRate / 10) // 100ms chunks of silence for filling gaps
+        val silence = ShortArray(sampleRate / 2) // 500ms chunks of silence for filling gaps
 
         while (scope?.isActive == true) {
             val sample = pcmBuffer.get()

@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.heartbeets.audio.AudioEngine
 import com.heartbeets.audio.BinauralPreset
 import com.heartbeets.audio.NoiseType
+import com.heartbeets.audio.SolfeggioFrequency
 import com.heartbeets.audio.SoundPack
 import com.heartbeets.audio.SoundPackRegistry
 import com.heartbeets.audio.SoundPackRepository
@@ -126,6 +127,7 @@ class ListenViewModel(application: Application) : AndroidViewModel(application) 
         val synthParams = profile?.synthParams?.toSynthParams() ?: SynthParams.CLASSIC
         val noiseType = try { NoiseType.valueOf(profile?.noiseType ?: "NONE") } catch (_: Exception) { NoiseType.NONE }
         val binauralPreset = try { BinauralPreset.valueOf(profile?.binauralPreset ?: "NONE") } catch (_: Exception) { BinauralPreset.NONE }
+        val solfeggioFreq = try { SolfeggioFrequency.valueOf(profile?.solfeggioFrequency ?: "NONE") } catch (_: Exception) { SolfeggioFrequency.NONE }
         val pack = SoundPack(
             id = "shared_${profileId.ifBlank { "default" }}",
             displayName = profile?.name ?: "Shared",
@@ -137,6 +139,8 @@ class ListenViewModel(application: Application) : AndroidViewModel(application) 
             binauralCarrierHz = (profile?.binauralCarrierHz ?: 200.0).toFloat(),
             binauralBeatHz = (profile?.binauralBeatHz ?: 10.0).toFloat(),
             binauralVolume = (profile?.binauralVolume ?: 0.3).toFloat(),
+            solfeggioFrequency = solfeggioFreq,
+            solfeggioVolume = (profile?.solfeggioVolume ?: 0.3).toFloat(),
         )
         _receivedPack.value = pack
         audioEngine.setSoundPack(pack)

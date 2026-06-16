@@ -41,6 +41,7 @@ internal class CadenceScheduler {
     // --- Background layers ---
     private val noiseGenerator = NoiseGenerator()
     private val binauralGenerator = BinauralGenerator(sampleRate)
+    private val solfeggioGenerator = SolfeggioGenerator(sampleRate)
 
     @Volatile
     private var noiseType: NoiseType = NoiseType.NONE
@@ -52,6 +53,10 @@ internal class CadenceScheduler {
     private var binauralBeatHz: Float = 0f
     @Volatile
     private var binauralVolume: Float = 0f
+    @Volatile
+    private var solfeggioHz: Float = 0f
+    @Volatile
+    private var solfeggioVolume: Float = 0f
 
     private var audioTrack: AudioTrack? = null
     private var scope: CoroutineScope? = null
@@ -87,6 +92,14 @@ internal class CadenceScheduler {
         binauralCarrierHz = carrierHz
         binauralBeatHz = beatHz
         binauralVolume = volume
+    }
+
+    /**
+     * Configure solfeggio tone layer.
+     */
+    fun setSolfeggio(frequencyHz: Float, volume: Float) {
+        solfeggioHz = frequencyHz
+        solfeggioVolume = volume
     }
 
     /**
@@ -143,6 +156,7 @@ internal class CadenceScheduler {
         audioTrack = track
 
         binauralGenerator.reset()
+        solfeggioGenerator.reset()
 
         val handler = CoroutineExceptionHandler { _, t ->
             if (t !is CancellationException) {
@@ -190,11 +204,14 @@ internal class CadenceScheduler {
         if (binauralVolume > 0f && binauralCarrierHz > 0f) {
             binauralGenerator.fillStereo(stereo, binauralCarrierHz, binauralBeatHz, binauralVolume)
         }
+        if (solfeggioVolume > 0f && solfeggioHz > 0f) {
+            solfeggioGenerator.fillStereo(stereo, solfeggioHz, solfeggioVolume)
+        }
         return stereo
     }
 
     /**
-     * Build a stereo silence chunk with noise and binaural mixed in.
+     * Build a stereo silence chunk with noise, binaural, and solfeggio mixed in.
      */
     private fun buildSilenceStereoChunk(length: Int): ShortArray {
         val stereo = ShortArray(length * 2) // all zeros = silence
@@ -202,6 +219,9 @@ internal class CadenceScheduler {
         noiseGenerator.fillStereo(stereo, noiseType, noiseVolume)
         if (binauralVolume > 0f && binauralCarrierHz > 0f) {
             binauralGenerator.fillStereo(stereo, binauralCarrierHz, binauralBeatHz, binauralVolume)
+        }
+        if (solfeggioVolume > 0f && solfeggioHz > 0f) {
+            solfeggioGenerator.fillStereo(stereo, solfeggioHz, solfeggioVolume)
         }
         return stereo
     }

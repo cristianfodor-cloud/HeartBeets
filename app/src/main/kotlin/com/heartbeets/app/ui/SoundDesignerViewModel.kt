@@ -8,6 +8,7 @@ import androidx.lifecycle.viewModelScope
 import com.heartbeets.audio.AudioEngine
 import com.heartbeets.audio.BinauralPreset
 import com.heartbeets.audio.NoiseType
+import com.heartbeets.audio.SolfeggioFrequency
 import com.heartbeets.audio.SoundPack
 import com.heartbeets.audio.SoundPackRegistry
 import com.heartbeets.audio.SoundPackRepository
@@ -55,6 +56,13 @@ class SoundDesignerViewModel(
     private val _binauralVolume = MutableStateFlow(0.3f)
     val binauralVolume: StateFlow<Float> = _binauralVolume.asStateFlow()
 
+    // Solfeggio tone
+    private val _solfeggioFrequency = MutableStateFlow(SolfeggioFrequency.NONE)
+    val solfeggioFrequency: StateFlow<SolfeggioFrequency> = _solfeggioFrequency.asStateFlow()
+
+    private val _solfeggioVolume = MutableStateFlow(0.3f)
+    val solfeggioVolume: StateFlow<Float> = _solfeggioVolume.asStateFlow()
+
     init {
         // If editing an existing pack, load its name
         editPackId?.let { id ->
@@ -68,6 +76,8 @@ class SoundDesignerViewModel(
                 _binauralCarrierHz.value = pack.binauralCarrierHz
                 _binauralBeatHz.value = pack.binauralBeatHz
                 _binauralVolume.value = pack.binauralVolume
+                _solfeggioFrequency.value = pack.solfeggioFrequency
+                _solfeggioVolume.value = pack.solfeggioVolume
             }
         }
         // Start preview playback
@@ -117,6 +127,14 @@ class SoundDesignerViewModel(
         _binauralVolume.value = volume
     }
 
+    fun updateSolfeggioFrequency(freq: SolfeggioFrequency) {
+        _solfeggioFrequency.value = freq
+    }
+
+    fun updateSolfeggioVolume(volume: Float) {
+        _solfeggioVolume.value = volume
+    }
+
     fun preview() {
         audioEngine.previewSynthParams(_params.value)
     }
@@ -136,6 +154,8 @@ class SoundDesignerViewModel(
                 binauralCarrierHz = _binauralCarrierHz.value,
                 binauralBeatHz = _binauralBeatHz.value,
                 binauralVolume = _binauralVolume.value,
+                solfeggioFrequency = _solfeggioFrequency.value,
+                solfeggioVolume = _solfeggioVolume.value,
             )
             repository.save(pack)
             onDone(id)

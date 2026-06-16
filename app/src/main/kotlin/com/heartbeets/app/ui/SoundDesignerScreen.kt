@@ -11,11 +11,13 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import com.heartbeets.audio.BinauralPreset
 import com.heartbeets.audio.NoiseType
+import com.heartbeets.audio.SolfeggioFrequency
 import com.heartbeets.audio.SynthParams
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun SoundDesignerScreen(
     viewModel: SoundDesignerViewModel,
@@ -31,6 +33,8 @@ fun SoundDesignerScreen(
     val binauralCarrierHz by viewModel.binauralCarrierHz.collectAsState()
     val binauralBeatHz by viewModel.binauralBeatHz.collectAsState()
     val binauralVolume by viewModel.binauralVolume.collectAsState()
+    val solfeggioFrequency by viewModel.solfeggioFrequency.collectAsState()
+    val solfeggioVolume by viewModel.solfeggioVolume.collectAsState()
 
     Scaffold(
         containerColor = androidx.compose.ui.graphics.Color.Transparent,
@@ -234,6 +238,40 @@ fun SoundDesignerScreen(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                }
+            }
+
+            HorizontalDivider()
+
+            // --- Solfeggio Tone ---
+            SectionHeader("Solfeggio Frequency")
+            Text(
+                "A continuous pure tone layered under the heartbeat.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(4.dp))
+            // Show None chip + all frequencies in a scrollable flow
+            androidx.compose.foundation.layout.FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                SolfeggioFrequency.entries.forEach { freq ->
+                    FilterChip(
+                        selected = solfeggioFrequency == freq,
+                        onClick = { viewModel.updateSolfeggioFrequency(freq) },
+                        label = { Text(if (freq == SolfeggioFrequency.NONE) "None" else freq.label) },
+                    )
+                }
+            }
+            if (solfeggioFrequency != SolfeggioFrequency.NONE) {
+                Text(
+                    solfeggioFrequency.purpose,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                ParamSlider("Volume", solfeggioVolume, 0f, 1f) {
+                    viewModel.updateSolfeggioVolume(it)
                 }
             }
 

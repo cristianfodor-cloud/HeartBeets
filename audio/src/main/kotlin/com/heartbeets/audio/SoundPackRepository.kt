@@ -87,6 +87,9 @@ class SoundPackRepository(context: Context) {
         put("binauralCarrierHz", pack.binauralCarrierHz.toDouble())
         put("binauralBeatHz", pack.binauralBeatHz.toDouble())
         put("binauralVolume", pack.binauralVolume.toDouble())
+        // Solfeggio tone
+        put("solfeggioFrequency", pack.solfeggioFrequency.name)
+        put("solfeggioVolume", pack.solfeggioVolume.toDouble())
     }
 
     private fun fromJson(obj: JSONObject): SoundPack {
@@ -124,6 +127,8 @@ class SoundPackRepository(context: Context) {
             binauralCarrierHz = obj.optDouble("binauralCarrierHz", 200.0).toFloat(),
             binauralBeatHz = obj.optDouble("binauralBeatHz", 10.0).toFloat(),
             binauralVolume = obj.optDouble("binauralVolume", 0.3).toFloat(),
+            solfeggioFrequency = try { SolfeggioFrequency.valueOf(obj.optString("solfeggioFrequency", "NONE")) } catch (_: Exception) { SolfeggioFrequency.NONE },
+            solfeggioVolume = obj.optDouble("solfeggioVolume", 0.3).toFloat(),
         )
     }
 }

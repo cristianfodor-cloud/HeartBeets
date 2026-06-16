@@ -131,6 +131,9 @@ class AudioEngine(private val context: Context) {
         }
         val binVol = if (pack.binauralPreset == BinauralPreset.NONE) 0f else pack.binauralVolume
         scheduler.setBinaural(carrierHz, beatHz, binVol)
+        // Configure solfeggio tone
+        val solVol = if (pack.solfeggioFrequency == SolfeggioFrequency.NONE) 0f else pack.solfeggioVolume
+        scheduler.setSolfeggio(pack.solfeggioFrequency.hz, solVol)
     }
 
     private fun loadPcm(pack: SoundPack): ShortArray {

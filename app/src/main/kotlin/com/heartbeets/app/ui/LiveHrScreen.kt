@@ -67,6 +67,7 @@ import com.heartbeets.audio.BinauralPreset
 import com.heartbeets.audio.HeartbeatProfile
 import com.heartbeets.audio.NoiseType
 import com.heartbeets.audio.ProfileAnchorMode
+import com.heartbeets.audio.SolfeggioFrequency
 import com.heartbeets.audio.SoundPackRegistry
 import com.heartbeets.audio.SynthParams
 import com.heartbeets.core.ConnectionState
@@ -270,6 +271,8 @@ fun LiveHrScreen(
                             binauralCarrierHz = (pack?.binauralCarrierHz ?: 200f).toDouble(),
                             binauralBeatHz = (pack?.binauralBeatHz ?: 10f).toDouble(),
                             binauralVolume = (pack?.binauralVolume ?: 0.3f).toDouble(),
+                            solfeggioFrequency = (pack?.solfeggioFrequency ?: SolfeggioFrequency.NONE).name,
+                            solfeggioVolume = (pack?.solfeggioVolume ?: 0.3f).toDouble(),
                         )
                         shareVm.goLive(profile)
                     }) { Text("Go Live") }

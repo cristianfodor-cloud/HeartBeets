@@ -20,4 +20,7 @@ data class SoundPack(
     val binauralCarrierHz: Float = 200f,
     val binauralBeatHz: Float = 10f,
     val binauralVolume: Float = 0.3f,
+    // Solfeggio tone
+    val solfeggioFrequency: SolfeggioFrequency = SolfeggioFrequency.NONE,
+    val solfeggioVolume: Float = 0.3f,
 )

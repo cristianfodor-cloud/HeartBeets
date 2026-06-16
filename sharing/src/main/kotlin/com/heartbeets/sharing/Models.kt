@@ -2,6 +2,7 @@ package com.heartbeets.sharing
 
 import com.heartbeets.audio.BinauralPreset
 import com.heartbeets.audio.NoiseType
+import com.heartbeets.audio.SolfeggioFrequency
 import com.heartbeets.audio.SynthParams
 
 /**
@@ -37,6 +38,9 @@ data class SharedProfile(
     val binauralCarrierHz: Double = 200.0,
     val binauralBeatHz: Double = 10.0,
     val binauralVolume: Double = 0.3,
+    // Solfeggio tone
+    val solfeggioFrequency: String = "NONE",
+    val solfeggioVolume: Double = 0.3,
 )
 
 /**

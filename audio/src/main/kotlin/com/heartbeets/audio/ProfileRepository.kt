@@ -205,6 +205,59 @@ class ProfileRepository(context: Context) {
                     ProfileStage(targetOffsetBpm = 0, durationSec = 30, curve = EasingCurve.EASE_OUT),
                 )
             ),
+            HeartbeatProfile(
+                id = "preset-sleep-8h",
+                name = "Full Night Sleep",
+                description = "8-hour session: slow descent to -15 BPM, hold through the night, gentle wake.",
+                isPreset = true,
+                anchorMode = ProfileAnchorMode.ABSOLUTE,
+                startBpm = 60,
+                stages = listOf(
+                    ProfileStage(targetOffsetBpm = 0, durationSec = 300, curve = EasingCurve.LINEAR),
+                    ProfileStage(targetOffsetBpm = -5, durationSec = 600, curve = EasingCurve.EASE_OUT),
+                    ProfileStage(targetOffsetBpm = -10, durationSec = 900, curve = EasingCurve.EASE_OUT),
+                    ProfileStage(targetOffsetBpm = -15, durationSec = 25200, curve = EasingCurve.LINEAR),
+                    ProfileStage(targetOffsetBpm = -5, durationSec = 900, curve = EasingCurve.EASE_IN),
+                    ProfileStage(targetOffsetBpm = 0, durationSec = 300, curve = EasingCurve.EASE_IN),
+                )
+            ),
+            HeartbeatProfile(
+                id = "preset-long-meditation",
+                name = "Long Meditation (1h)",
+                description = "60-minute steady hold at 55 BPM. Pair with Meditation or Solfeggio pack.",
+                isPreset = true,
+                anchorMode = ProfileAnchorMode.ABSOLUTE,
+                startBpm = 55,
+                stages = listOf(
+                    ProfileStage(targetOffsetBpm = 0, durationSec = 120, curve = EasingCurve.EASE_OUT),
+                    ProfileStage(targetOffsetBpm = 0, durationSec = 3480, curve = EasingCurve.LINEAR),
+                )
+            ),
+            HeartbeatProfile(
+                id = "preset-sleep-4h",
+                name = "Half Night Sleep",
+                description = "4-hour session: gradual descent to deep rest, then hold.",
+                isPreset = true,
+                anchorMode = ProfileAnchorMode.ABSOLUTE,
+                startBpm = 60,
+                stages = listOf(
+                    ProfileStage(targetOffsetBpm = 0, durationSec = 300, curve = EasingCurve.LINEAR),
+                    ProfileStage(targetOffsetBpm = -5, durationSec = 600, curve = EasingCurve.EASE_OUT),
+                    ProfileStage(targetOffsetBpm = -12, durationSec = 900, curve = EasingCurve.EASE_OUT),
+                    ProfileStage(targetOffsetBpm = -12, durationSec = 12600, curve = EasingCurve.LINEAR),
+                )
+            ),
+            HeartbeatProfile(
+                id = "preset-steady-8h",
+                name = "Steady 8h",
+                description = "8-hour steady hold at 60 BPM. Set it and sleep through the night.",
+                isPreset = true,
+                anchorMode = ProfileAnchorMode.ABSOLUTE,
+                startBpm = 60,
+                stages = listOf(
+                    ProfileStage(targetOffsetBpm = 0, durationSec = 28800, curve = EasingCurve.LINEAR),
+                )
+            ),
         )
     }
 }

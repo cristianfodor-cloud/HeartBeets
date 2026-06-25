@@ -3,6 +3,7 @@ package com.heartbeets.sharing
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.heartbeets.audio.AffirmationSet
 import com.heartbeets.audio.AudioEngine
 import com.heartbeets.audio.BinauralPreset
 import com.heartbeets.audio.NoiseType
@@ -128,6 +129,7 @@ class ListenViewModel(application: Application) : AndroidViewModel(application) 
         val noiseType = try { NoiseType.valueOf(profile?.noiseType ?: "NONE") } catch (_: Exception) { NoiseType.NONE }
         val binauralPreset = try { BinauralPreset.valueOf(profile?.binauralPreset ?: "NONE") } catch (_: Exception) { BinauralPreset.NONE }
         val solfeggioFreq = try { SolfeggioFrequency.valueOf(profile?.solfeggioFrequency ?: "NONE") } catch (_: Exception) { SolfeggioFrequency.NONE }
+        val affirmSet = try { AffirmationSet.valueOf(profile?.affirmationSet ?: "NONE") } catch (_: Exception) { AffirmationSet.NONE }
         val pack = SoundPack(
             id = "shared_${profileId.ifBlank { "default" }}",
             displayName = profile?.name ?: "Shared",
@@ -141,6 +143,12 @@ class ListenViewModel(application: Application) : AndroidViewModel(application) 
             binauralVolume = (profile?.binauralVolume ?: 0.3).toFloat(),
             solfeggioFrequency = solfeggioFreq,
             solfeggioVolume = (profile?.solfeggioVolume ?: 0.3).toFloat(),
+            affirmationSet = affirmSet,
+            affirmationCustomTexts = profile?.affirmationCustomTexts ?: emptyList(),
+            affirmationIntervalSec = profile?.affirmationIntervalSec ?: 30,
+            affirmationVolume = (profile?.affirmationVolume ?: 0.8).toFloat(),
+            affirmationSpeechRate = (profile?.affirmationSpeechRate ?: 0.9).toFloat(),
+            affirmationPitch = (profile?.affirmationPitch ?: 1.0).toFloat(),
         )
         _receivedPack.value = pack
         audioEngine.setSoundPack(pack)

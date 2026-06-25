@@ -5,6 +5,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
+import org.json.JSONException
 import java.io.File
 import java.util.UUID
 
@@ -90,6 +91,14 @@ class SoundPackRepository(context: Context) {
         // Solfeggio tone
         put("solfeggioFrequency", pack.solfeggioFrequency.name)
         put("solfeggioVolume", pack.solfeggioVolume.toDouble())
+        // Affirmations
+        put("affirmationSet", pack.affirmationSet.name)
+        put("affirmationCustomTexts", JSONArray(pack.affirmationCustomTexts))
+        put("affirmationIntervalSec", pack.affirmationIntervalSec)
+        put("affirmationVolume", pack.affirmationVolume.toDouble())
+        put("affirmationSpeechRate", pack.affirmationSpeechRate.toDouble())
+        put("affirmationPitch", pack.affirmationPitch.toDouble())
+        if (pack.affirmationVoiceName != null) put("affirmationVoiceName", pack.affirmationVoiceName)
     }
 
     private fun fromJson(obj: JSONObject): SoundPack {
@@ -129,6 +138,15 @@ class SoundPackRepository(context: Context) {
             binauralVolume = obj.optDouble("binauralVolume", 0.3).toFloat(),
             solfeggioFrequency = try { SolfeggioFrequency.valueOf(obj.optString("solfeggioFrequency", "NONE")) } catch (_: Exception) { SolfeggioFrequency.NONE },
             solfeggioVolume = obj.optDouble("solfeggioVolume", 0.3).toFloat(),
+            affirmationSet = try { AffirmationSet.valueOf(obj.optString("affirmationSet", "NONE")) } catch (_: Exception) { AffirmationSet.NONE },
+            affirmationCustomTexts = obj.optJSONArray("affirmationCustomTexts")?.let { arr ->
+                (0 until arr.length()).map { arr.getString(it) }
+            } ?: emptyList(),
+            affirmationIntervalSec = obj.optInt("affirmationIntervalSec", 30),
+            affirmationVolume = obj.optDouble("affirmationVolume", 0.8).toFloat(),
+            affirmationSpeechRate = obj.optDouble("affirmationSpeechRate", 0.9).toFloat(),
+            affirmationPitch = obj.optDouble("affirmationPitch", 1.0).toFloat(),
+            affirmationVoiceName = obj.optString("affirmationVoiceName", null),
         )
     }
 }

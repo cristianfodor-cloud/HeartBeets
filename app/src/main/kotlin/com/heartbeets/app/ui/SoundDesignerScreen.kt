@@ -12,6 +12,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import com.heartbeets.audio.AffirmationSet
 import com.heartbeets.audio.BinauralPreset
 import com.heartbeets.audio.NoiseType
 import com.heartbeets.audio.SolfeggioFrequency
@@ -35,6 +36,16 @@ fun SoundDesignerScreen(
     val binauralVolume by viewModel.binauralVolume.collectAsState()
     val solfeggioFrequency by viewModel.solfeggioFrequency.collectAsState()
     val solfeggioVolume by viewModel.solfeggioVolume.collectAsState()
+    val affirmationSet by viewModel.affirmationSet.collectAsState()
+    val affirmationCustomTexts by viewModel.affirmationCustomTexts.collectAsState()
+    val affirmationIntervalSec by viewModel.affirmationIntervalSec.collectAsState()
+    val affirmationVolume by viewModel.affirmationVolume.collectAsState()
+    val affirmationSpeechRate by viewModel.affirmationSpeechRate.collectAsState()
+    val affirmationPitch by viewModel.affirmationPitch.collectAsState()
+    val affirmationVoiceName by viewModel.affirmationVoiceName.collectAsState()
+    val availableVoices by viewModel.availableVoices.collectAsState()
+    var customTextInput by remember { mutableStateOf("") }
+    var voiceDropdownExpanded by remember { mutableStateOf(false) }
 
     Scaffold(
         containerColor = androidx.compose.ui.graphics.Color.Transparent,
@@ -272,6 +283,134 @@ fun SoundDesignerScreen(
                 )
                 ParamSlider("Volume", solfeggioVolume, 0f, 1f) {
                     viewModel.updateSolfeggioVolume(it)
+                }
+            }
+
+            HorizontalDivider()
+
+            // --- Affirmations ---
+            SectionHeader("Affirmations")
+            Text(
+                "Spoken positive affirmations at regular intervals via text-to-speech.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(4.dp))
+            androidx.compose.foundation.layout.FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                AffirmationSet.entries.forEach { set ->
+                    FilterChip(
+                        selected = affirmationSet == set,
+                        onClick = { viewModel.updateAffirmationSet(set) },
+                        label = { Text(set.label) },
+                    )
+                }
+            }
+            if (affirmationSet != AffirmationSet.NONE) {
+                if (affirmationSet == AffirmationSet.CUSTOM) {
+                    // Custom affirmation text editor
+                    OutlinedTextField(
+                        value = customTextInput,
+                        onValueChange = { customTextInput = it },
+                        label = { Text("Add affirmation") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        trailingIcon = {
+                            if (customTextInput.isNotBlank()) {
+                                IconButton(onClick = {
+                                    viewModel.updateAffirmationCustomTexts(
+                                        affirmationCustomTexts + customTextInput.trim()
+                                    )
+                                    customTextInput = ""
+                                }) {
+                                    Text("+", style = MaterialTheme.typography.titleLarge)
+                                }
+                            }
+                        },
+                    )
+                    affirmationCustomTexts.forEachIndexed { index, text ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                text,
+                                style = MaterialTheme.typography.bodySmall,
+                                modifier = Modifier.weight(1f),
+                            )
+                            IconButton(onClick = {
+                                viewModel.updateAffirmationCustomTexts(
+                                    affirmationCustomTexts.toMutableList().also { it.removeAt(index) }
+                                )
+                            }) {
+                                Text("\u2715", style = MaterialTheme.typography.bodySmall)
+                            }
+                        }
+                    }
+                } else {
+                    // Show first few from the selected set
+                    Text(
+                        affirmationSet.affirmations.take(3).joinToString(" \u2022 ") + " \u2026",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
+                ParamSliderInt("Interval (sec)", affirmationIntervalSec, 10, 120) {
+                    viewModel.updateAffirmationIntervalSec(it)
+                }
+                ParamSlider("Volume", affirmationVolume, 0f, 1f) {
+                    viewModel.updateAffirmationVolume(it)
+                }
+                ParamSlider("Speech Rate", affirmationSpeechRate, 0.5f, 1.5f) {
+                    viewModel.updateAffirmationSpeechRate(it)
+                }
+                ParamSlider("Pitch", affirmationPitch, 0.5f, 1.5f) {
+                    viewModel.updateAffirmationPitch(it)
+                }
+                // Voice picker
+                if (availableVoices.isNotEmpty()) {
+                    Spacer(Modifier.height(8.dp))
+                    Text("Voice", style = MaterialTheme.typography.bodySmall)
+                    Box {
+                        val selectedLabel = availableVoices.firstOrNull { it.first == affirmationVoiceName }?.second ?: "Default"
+                        OutlinedButton(
+                            onClick = { voiceDropdownExpanded = true },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text(selectedLabel, maxLines = 1)
+                        }
+                        DropdownMenu(
+                            expanded = voiceDropdownExpanded,
+                            onDismissRequest = { voiceDropdownExpanded = false },
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("Default") },
+                                onClick = {
+                                    viewModel.updateAffirmationVoiceName(null)
+                                    voiceDropdownExpanded = false
+                                },
+                            )
+                            availableVoices.forEach { (name, label) ->
+                                DropdownMenuItem(
+                                    text = { Text(label) },
+                                    onClick = {
+                                        viewModel.updateAffirmationVoiceName(name)
+                                        voiceDropdownExpanded = false
+                                    },
+                                )
+                            }
+                        }
+                    }
+                }
+                Spacer(Modifier.height(4.dp))
+                OutlinedButton(
+                    onClick = { viewModel.previewAffirmation() },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text("Preview Voice")
                 }
             }
 

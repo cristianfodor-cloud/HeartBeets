@@ -167,13 +167,15 @@ private fun StageCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
                 Text("Duration", style = MaterialTheme.typography.bodySmall)
-                Text("${stage.durationSec}s", style = MaterialTheme.typography.bodySmall)
+                val mins = stage.durationSec / 60
+                val secs = stage.durationSec % 60
+                val label = if (mins > 0) "${mins}m ${secs}s" else "${secs}s"
+                Text(label, style = MaterialTheme.typography.bodySmall)
             }
             Slider(
                 value = stage.durationSec.toFloat(),
                 onValueChange = { onUpdate(stage.copy(durationSec = it.toInt().coerceAtLeast(5))) },
-                valueRange = 5f..300f,
-                steps = 58,
+                valueRange = 5f..3600f,
             )
 
             // Easing curve

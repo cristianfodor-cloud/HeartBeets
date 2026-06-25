@@ -31,6 +31,7 @@ import kotlinx.coroutines.launch
 class AudioEngine(private val context: Context) {
 
     private val scheduler = CadenceScheduler()
+    private val affirmationEngine = AffirmationEngine(context)
     private val _mode = MutableStateFlow(PlaybackMode.STOPPED)
     val mode: StateFlow<PlaybackMode> = _mode.asStateFlow()
 
@@ -134,6 +135,20 @@ class AudioEngine(private val context: Context) {
         // Configure solfeggio tone
         val solVol = if (pack.solfeggioFrequency == SolfeggioFrequency.NONE) 0f else pack.solfeggioVolume
         scheduler.setSolfeggio(pack.solfeggioFrequency.hz, solVol)
+        // Configure affirmations
+        val texts = if (pack.affirmationSet == AffirmationSet.CUSTOM) {
+            pack.affirmationCustomTexts
+        } else {
+            pack.affirmationSet.affirmations
+        }
+        affirmationEngine.configure(
+            texts = texts,
+            intervalSec = pack.affirmationIntervalSec,
+            vol = pack.affirmationVolume,
+            speechRate = pack.affirmationSpeechRate,
+            pitch = pack.affirmationPitch,
+            voiceName = pack.affirmationVoiceName,
+        )
     }
 
     private fun loadPcm(pack: SoundPack): ShortArray {
@@ -290,6 +305,7 @@ class AudioEngine(private val context: Context) {
                         _currentBpm.value = adjusted
                         if (!started) {
                             scheduler.start()
+                            affirmationEngine.start()
                             started = true
                         }
                     }
@@ -324,6 +340,7 @@ class AudioEngine(private val context: Context) {
         scheduler.updateBpm(startCadence)
         _currentBpm.value = startCadence
         scheduler.start()
+        affirmationEngine.start()
 
         profileJob = scope.launch {
             try {
@@ -352,6 +369,7 @@ class AudioEngine(private val context: Context) {
         profileJob = null
         profileInterpolator = null
         scheduler.stop()
+        affirmationEngine.stop()
         _mode.value = PlaybackMode.STOPPED
         _currentBpm.value = 0
     }
@@ -361,6 +379,10 @@ class AudioEngine(private val context: Context) {
      */
     fun release() {
         stopPlayback()
+        affirmationEngine.release()
         scope.cancel()
     }
+
+    /** Expose the affirmation engine for voice listing and preview in the UI. */
+    fun getAffirmationEngine(): AffirmationEngine = affirmationEngine
 }

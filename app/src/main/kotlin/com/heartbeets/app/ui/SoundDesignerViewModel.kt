@@ -5,6 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.heartbeets.audio.AffirmationSet
 import com.heartbeets.audio.AudioEngine
 import com.heartbeets.audio.BinauralPreset
 import com.heartbeets.audio.NoiseType
@@ -63,6 +64,32 @@ class SoundDesignerViewModel(
     private val _solfeggioVolume = MutableStateFlow(0.3f)
     val solfeggioVolume: StateFlow<Float> = _solfeggioVolume.asStateFlow()
 
+    // Affirmations
+    private val _affirmationSet = MutableStateFlow(AffirmationSet.NONE)
+    val affirmationSet: StateFlow<AffirmationSet> = _affirmationSet.asStateFlow()
+
+    private val _affirmationCustomTexts = MutableStateFlow<List<String>>(emptyList())
+    val affirmationCustomTexts: StateFlow<List<String>> = _affirmationCustomTexts.asStateFlow()
+
+    private val _affirmationIntervalSec = MutableStateFlow(30)
+    val affirmationIntervalSec: StateFlow<Int> = _affirmationIntervalSec.asStateFlow()
+
+    private val _affirmationVolume = MutableStateFlow(0.8f)
+    val affirmationVolume: StateFlow<Float> = _affirmationVolume.asStateFlow()
+
+    private val _affirmationSpeechRate = MutableStateFlow(0.9f)
+    val affirmationSpeechRate: StateFlow<Float> = _affirmationSpeechRate.asStateFlow()
+
+    private val _affirmationPitch = MutableStateFlow(1.0f)
+    val affirmationPitch: StateFlow<Float> = _affirmationPitch.asStateFlow()
+
+    private val _affirmationVoiceName = MutableStateFlow<String?>(null)
+    val affirmationVoiceName: StateFlow<String?> = _affirmationVoiceName.asStateFlow()
+
+    /** Available TTS voices as (name, displayLabel) pairs. */
+    private val _availableVoices = MutableStateFlow<List<Pair<String, String>>>(emptyList())
+    val availableVoices: StateFlow<List<Pair<String, String>>> = _availableVoices.asStateFlow()
+
     init {
         // If editing an existing pack, load its name
         editPackId?.let { id ->
@@ -78,10 +105,37 @@ class SoundDesignerViewModel(
                 _binauralVolume.value = pack.binauralVolume
                 _solfeggioFrequency.value = pack.solfeggioFrequency
                 _solfeggioVolume.value = pack.solfeggioVolume
+                _affirmationSet.value = pack.affirmationSet
+                _affirmationCustomTexts.value = pack.affirmationCustomTexts
+                _affirmationIntervalSec.value = pack.affirmationIntervalSec
+                _affirmationVolume.value = pack.affirmationVolume
+                _affirmationSpeechRate.value = pack.affirmationSpeechRate
+                _affirmationPitch.value = pack.affirmationPitch
+                _affirmationVoiceName.value = pack.affirmationVoiceName
             }
         }
         // Start preview playback
         audioEngine.setSynthParams(_params.value)
+        // Load voices once TTS initializes
+        loadVoices()
+    }
+
+    private fun loadVoices() {
+        viewModelScope.launch {
+            // TTS may take a moment to init; retry a few times
+            repeat(10) {
+                val voices = audioEngine.getAffirmationEngine().getAvailableVoices()
+                if (voices.isNotEmpty()) {
+                    _availableVoices.value = voices.mapIndexed { index, voice ->
+                        val country = voice.locale.displayCountry.ifBlank { voice.locale.country }
+                        val label = "Voice ${index + 1} ($country)"
+                        voice.name to label
+                    }
+                    return@launch
+                }
+                kotlinx.coroutines.delay(500)
+            }
+        }
     }
 
     fun updateParams(newParams: SynthParams) {
@@ -135,6 +189,53 @@ class SoundDesignerViewModel(
         _solfeggioVolume.value = volume
     }
 
+    fun updateAffirmationSet(set: AffirmationSet) {
+        _affirmationSet.value = set
+    }
+
+    fun updateAffirmationCustomTexts(texts: List<String>) {
+        _affirmationCustomTexts.value = texts
+    }
+
+    fun updateAffirmationIntervalSec(sec: Int) {
+        _affirmationIntervalSec.value = sec
+    }
+
+    fun updateAffirmationVolume(volume: Float) {
+        _affirmationVolume.value = volume
+    }
+
+    fun updateAffirmationSpeechRate(rate: Float) {
+        _affirmationSpeechRate.value = rate
+    }
+
+    fun updateAffirmationPitch(pitch: Float) {
+        _affirmationPitch.value = pitch
+    }
+
+    fun updateAffirmationVoiceName(name: String?) {
+        _affirmationVoiceName.value = name
+    }
+
+    fun previewAffirmation() {
+        val texts = if (_affirmationSet.value == AffirmationSet.CUSTOM) {
+            _affirmationCustomTexts.value
+        } else {
+            _affirmationSet.value.affirmations
+        }
+        val sample = texts.firstOrNull() ?: return
+        val engine = audioEngine.getAffirmationEngine()
+        engine.configure(
+            texts = texts,
+            intervalSec = _affirmationIntervalSec.value,
+            vol = _affirmationVolume.value,
+            speechRate = _affirmationSpeechRate.value,
+            pitch = _affirmationPitch.value,
+            voiceName = _affirmationVoiceName.value,
+        )
+        engine.speakOne(sample)
+    }
+
     fun preview() {
         audioEngine.previewSynthParams(_params.value)
     }
@@ -156,6 +257,13 @@ class SoundDesignerViewModel(
                 binauralVolume = _binauralVolume.value,
                 solfeggioFrequency = _solfeggioFrequency.value,
                 solfeggioVolume = _solfeggioVolume.value,
+                affirmationSet = _affirmationSet.value,
+                affirmationCustomTexts = _affirmationCustomTexts.value,
+                affirmationIntervalSec = _affirmationIntervalSec.value,
+                affirmationVolume = _affirmationVolume.value,
+                affirmationSpeechRate = _affirmationSpeechRate.value,
+                affirmationPitch = _affirmationPitch.value,
+                affirmationVoiceName = _affirmationVoiceName.value,
             )
             repository.save(pack)
             onDone(id)

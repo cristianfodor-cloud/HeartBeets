@@ -171,6 +171,24 @@ class LiveHrViewModel(
 
     fun previewPack(pack: SoundPack) {
         audioEngine.previewPack(pack)
+        // Also speak an affirmation if the pack has one
+        val texts = if (pack.affirmationSet == com.heartbeets.audio.AffirmationSet.CUSTOM) {
+            pack.affirmationCustomTexts
+        } else {
+            pack.affirmationSet.affirmations
+        }
+        if (texts.isNotEmpty()) {
+            val engine = audioEngine.getAffirmationEngine()
+            engine.configure(
+                texts = texts,
+                intervalSec = pack.affirmationIntervalSec,
+                vol = pack.affirmationVolume,
+                speechRate = pack.affirmationSpeechRate,
+                pitch = pack.affirmationPitch,
+                voiceName = pack.affirmationVoiceName,
+            )
+            engine.speakOne(texts.random())
+        }
     }
 
     fun previewBeat() {

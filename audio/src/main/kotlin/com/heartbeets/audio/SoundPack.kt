@@ -23,4 +23,12 @@ data class SoundPack(
     // Solfeggio tone
     val solfeggioFrequency: SolfeggioFrequency = SolfeggioFrequency.NONE,
     val solfeggioVolume: Float = 0.3f,
+    // Affirmations (TTS)
+    val affirmationSet: AffirmationSet = AffirmationSet.NONE,
+    val affirmationCustomTexts: List<String> = emptyList(),
+    val affirmationIntervalSec: Int = 30,
+    val affirmationVolume: Float = 0.8f,
+    val affirmationSpeechRate: Float = 0.9f,
+    val affirmationPitch: Float = 1.0f,
+    val affirmationVoiceName: String? = null,
 )

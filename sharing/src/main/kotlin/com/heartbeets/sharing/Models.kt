@@ -1,5 +1,6 @@
 package com.heartbeets.sharing
 
+import com.heartbeets.audio.AffirmationSet
 import com.heartbeets.audio.BinauralPreset
 import com.heartbeets.audio.NoiseType
 import com.heartbeets.audio.SolfeggioFrequency
@@ -41,6 +42,13 @@ data class SharedProfile(
     // Solfeggio tone
     val solfeggioFrequency: String = "NONE",
     val solfeggioVolume: Double = 0.3,
+    // Affirmations
+    val affirmationSet: String = "NONE",
+    val affirmationCustomTexts: List<String> = emptyList(),
+    val affirmationIntervalSec: Int = 30,
+    val affirmationVolume: Double = 0.8,
+    val affirmationSpeechRate: Double = 0.9,
+    val affirmationPitch: Double = 1.0,
 )
 
 /**

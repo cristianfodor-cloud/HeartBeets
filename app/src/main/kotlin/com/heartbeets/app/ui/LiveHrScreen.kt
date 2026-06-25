@@ -273,6 +273,12 @@ fun LiveHrScreen(
                             binauralVolume = (pack?.binauralVolume ?: 0.3f).toDouble(),
                             solfeggioFrequency = (pack?.solfeggioFrequency ?: SolfeggioFrequency.NONE).name,
                             solfeggioVolume = (pack?.solfeggioVolume ?: 0.3f).toDouble(),
+                            affirmationSet = (pack?.affirmationSet ?: com.heartbeets.audio.AffirmationSet.NONE).name,
+                            affirmationCustomTexts = pack?.affirmationCustomTexts ?: emptyList(),
+                            affirmationIntervalSec = pack?.affirmationIntervalSec ?: 30,
+                            affirmationVolume = (pack?.affirmationVolume ?: 0.8f).toDouble(),
+                            affirmationSpeechRate = (pack?.affirmationSpeechRate ?: 0.9f).toDouble(),
+                            affirmationPitch = (pack?.affirmationPitch ?: 1.0f).toDouble(),
                         )
                         shareVm.goLive(profile)
                     }) { Text("Go Live") }

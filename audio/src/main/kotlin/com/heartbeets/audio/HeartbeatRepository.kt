@@ -11,9 +11,9 @@ import java.util.UUID
 /**
  * Persists user-created [Heartbeat]s to JSON on local storage.
  */
-class HeartbeatRepository(context: Context) {
+class HeartbeatRepository(context: Context, fileName: String = "heartbeats.json") {
 
-    private val storageFile = File(context.filesDir, "heartbeats.json")
+    private val storageFile = File(context.filesDir, fileName)
 
     fun newId(): String = UUID.randomUUID().toString()
 

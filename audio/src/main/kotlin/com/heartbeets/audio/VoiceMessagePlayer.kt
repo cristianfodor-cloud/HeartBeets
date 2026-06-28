@@ -43,8 +43,8 @@ class VoiceMessagePlayer {
     }
 
     /**
-     * Start playing voice messages at the configured interval.
-     * First message plays after one full interval.
+     * Start playing voice messages. Plays the first message immediately,
+     * then subsequent messages after each interval.
      */
     fun start() {
         if (recordings.isEmpty()) return
@@ -52,10 +52,14 @@ class VoiceMessagePlayer {
         scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         timerJob = scope?.launch {
             try {
-                delay(intervalMs)
-                while (isActive) {
-                    playNext()
-                    delay(intervalMs)
+                // Play immediately
+                playNext()
+                // If there are more recordings or we should loop, continue with interval
+                if (recordings.size > 1) {
+                    while (isActive) {
+                        delay(intervalMs)
+                        playNext()
+                    }
                 }
             } catch (_: CancellationException) { /* normal */ }
         }

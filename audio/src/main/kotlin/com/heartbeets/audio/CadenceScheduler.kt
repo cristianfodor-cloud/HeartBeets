@@ -194,10 +194,11 @@ internal class CadenceScheduler {
      */
     private fun buildStereoChunk(monoSamples: ShortArray, offset: Int, length: Int): ShortArray {
         val stereo = ShortArray(length * 2)
-        // Center-pan: duplicate mono to both channels
+        // Center-pan: duplicate mono to both channels with 3x boost for beat prominence
         for (i in 0 until length) {
-            stereo[i * 2] = monoSamples[offset + i]
-            stereo[i * 2 + 1] = monoSamples[offset + i]
+            val boosted = (monoSamples[offset + i].toInt() * 3).coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt()).toShort()
+            stereo[i * 2] = boosted
+            stereo[i * 2 + 1] = boosted
         }
         // Mix background layers
         noiseGenerator.fillStereo(stereo, noiseType, noiseVolume)

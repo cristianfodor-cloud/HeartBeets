@@ -118,16 +118,16 @@ class AudioEngine(private val context: Context) {
 
                     // Check if timeline is complete
                     if (elapsedSec >= heartbeat.totalDurationSec) {
-                        // Hold at final BPM indefinitely until stopped
                         break
                     }
                     delay(200)
                 }
-                // Hold phase — keep playing at final BPM
-                while (true) {
-                    _elapsedSec.value = ((System.currentTimeMillis() - startTime) / 1000).toInt()
-                    delay(1000)
-                }
+                // Timeline finished — stop playback directly
+                scheduler.stop()
+                voicePlayer.stop()
+                _playing.value = false
+                _currentBpm.value = 0
+                _elapsedSec.value = 0
             } catch (_: CancellationException) { /* normal */ }
         }
     }
@@ -158,12 +158,15 @@ class AudioEngine(private val context: Context) {
         scheduler.setSample(pcm)
     }
 
+    private var previewJob: Job? = null
+
     /**
      * Play a single heartbeat for preview.
      */
     fun previewBeat(params: SynthParams = activeHeartbeat?.synthParams ?: SynthParams.CLASSIC) {
-        val pcm = HeartbeatSynthesizer.synthesize(params)
-        scope.launch(Dispatchers.Default) {
+        previewJob?.cancel()
+        val pcm = boostSamples(HeartbeatSynthesizer.synthesize(params))
+        previewJob = scope.launch(Dispatchers.Default) {
             val track = AudioTrack.Builder()
                 .setAudioAttributes(
                     AudioAttributes.Builder()
@@ -194,6 +197,47 @@ class AudioEngine(private val context: Context) {
         }
     }
 
+    /**
+     * Play 3 heartbeats at a specific BPM for preview.
+     */
+    fun previewBeatsAtBpm(params: SynthParams, bpm: Int) {
+        previewJob?.cancel()
+        val pcm = boostSamples(HeartbeatSynthesizer.synthesize(params))
+        val beatIntervalMs = 60_000L / bpm
+        previewJob = scope.launch(Dispatchers.Default) {
+            val track = AudioTrack.Builder()
+                .setAudioAttributes(
+                    AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_MEDIA)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .build()
+                )
+                .setAudioFormat(
+                    AudioFormat.Builder()
+                        .setSampleRate(44100)
+                        .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
+                        .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                        .build()
+                )
+                .setBufferSizeInBytes(pcm.size * 2)
+                .setTransferMode(AudioTrack.MODE_STATIC)
+                .build()
+            try {
+                track.write(pcm, 0, pcm.size)
+                repeat(3) {
+                    track.stop()
+                    track.reloadStaticData()
+                    track.play()
+                    delay(beatIntervalMs)
+                }
+            } catch (_: CancellationException) { }
+            finally {
+                try { track.stop() } catch (_: IllegalStateException) {}
+                track.release()
+            }
+        }
+    }
+
     private fun computeBpmAtTime(timeline: List<TimelineSegment>, elapsedMs: Long): Int {
         var accumulatedMs = 0L
         for (seg in timeline) {
@@ -215,5 +259,12 @@ class AudioEngine(private val context: Context) {
         EasingCurve.EASE_IN -> t * t
         EasingCurve.EASE_OUT -> 1f - (1f - t) * (1f - t)
         EasingCurve.EASE_IN_OUT -> if (t < 0.5f) 2f * t * t else 1f - (-2f * t + 2f).let { it * it } / 2f
+    }
+
+    /** Boost PCM samples by 3x for louder preview output. */
+    private fun boostSamples(pcm: ShortArray): ShortArray {
+        return ShortArray(pcm.size) { i ->
+            (pcm[i].toInt() * 3).coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt()).toShort()
+        }
     }
 }

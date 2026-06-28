@@ -15,6 +15,7 @@ import com.heartbeets.audio.SolfeggioFrequency
 import com.heartbeets.audio.SynthParams
 import com.heartbeets.audio.TimelineSegment
 import com.heartbeets.audio.VoiceRecorder
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -38,7 +39,7 @@ class HeartbeatCreatorViewModel(
     val synthParams: StateFlow<SynthParams> = _synthParams.asStateFlow()
 
     // --- Timeline ---
-    private val _timeline = MutableStateFlow(listOf(TimelineSegment(65, 65, 300)))
+    private val _timeline = MutableStateFlow(listOf(TimelineSegment(66, 55, 213)))
     val timeline: StateFlow<List<TimelineSegment>> = _timeline.asStateFlow()
 
     // --- Noise ---
@@ -140,21 +141,57 @@ class HeartbeatCreatorViewModel(
     fun updateSolfeggioFrequency(f: SolfeggioFrequency) { _solfeggioFrequency.value = f }
     fun updateSolfeggioVolume(v: Float) { _solfeggioVolume.value = v }
 
-    fun updateVoiceEnabled(enabled: Boolean) { _voiceEnabled.value = enabled }
-    fun updateVoiceIntervalSec(sec: Int) { _voiceIntervalSec.value = sec }
     fun updateVoiceVolume(v: Float) { _voiceVolume.value = v }
 
-    fun startRecording() {
-        val packId = editId ?: "new_heartbeat"
-        val index = _voiceRecordings.value.size
-        val path = voiceRecorder.start(packId, index)
-        if (path != null) _isRecording.value = true
+    /** Apply a named preset and reset warmth/intensity to defaults. */
+    fun applySoundPreset(preset: SynthParams) {
+        _synthParams.value = preset
     }
 
+    // Recording countdown
+    private val _recordingSecondsLeft = MutableStateFlow(0)
+    val recordingSecondsLeft: StateFlow<Int> = _recordingSecondsLeft.asStateFlow()
+    private var recordingTimerJob: Job? = null
+
+    fun startRecording() {
+        // Only one recording allowed — delete existing first
+        val existing = _voiceRecordings.value
+        existing.forEach { voiceRecorder.deleteRecording(it) }
+        _voiceRecordings.value = emptyList()
+
+        val packId = editId ?: "new_heartbeat"
+        val path = voiceRecorder.start(packId, 0)
+        if (path != null) {
+            _isRecording.value = true
+            _recordingStartTime = System.currentTimeMillis()
+            val maxSec = 213 // always 3m33s max
+            _recordingSecondsLeft.value = maxSec
+            recordingTimerJob = viewModelScope.launch {
+                for (remaining in maxSec downTo 1) {
+                    _recordingSecondsLeft.value = remaining
+                    kotlinx.coroutines.delay(1000L)
+                }
+                // Auto-stop when time runs out
+                stopRecording()
+            }
+        }
+    }
+
+    private var _recordingStartTime = 0L
+
     fun stopRecording() {
+        recordingTimerJob?.cancel()
+        recordingTimerJob = null
+        val elapsedSec = ((System.currentTimeMillis() - _recordingStartTime) / 1000).toInt().coerceIn(11, 213)
+        _recordingSecondsLeft.value = 0
         val path = voiceRecorder.stop()
         _isRecording.value = false
-        if (path != null) _voiceRecordings.value = _voiceRecordings.value + path
+        if (path != null) {
+            _voiceRecordings.value = listOf(path)
+            // Set timeline duration to match actual recording length
+            val seg = _timeline.value.first()
+            _timeline.value = listOf(seg.copy(durationSec = elapsedSec))
+        }
     }
 
     fun deleteRecording(index: Int) {
@@ -175,6 +212,107 @@ class HeartbeatCreatorViewModel(
         audioEngine.previewBeat(_synthParams.value)
     }
 
+    /** Preview a few beats at a specific BPM. */
+    fun previewAtBpm(bpm: Int) {
+        audioEngine.previewBeatsAtBpm(_synthParams.value, bpm)
+    }
+
+    private val _previewingFull = MutableStateFlow(false)
+    val previewingFull: StateFlow<Boolean> = _previewingFull.asStateFlow()
+
+    private val _previewingBg = MutableStateFlow(false)
+    val previewingBg: StateFlow<Boolean> = _previewingBg.asStateFlow()
+
+    private var bgPreviewJob: Job? = null
+
+    /** Preview only the background layers (noise, binaural, solfeggio) — auto-stops after 5s. */
+    fun previewBackground() {
+        stopBackgroundPreview()
+        stopFullPreview()
+        val h = buildCurrentHeartbeat().copy(
+            synthParams = _synthParams.value.copy(masterGain = 0f),
+            voiceEnabled = false,
+        )
+        audioEngine.setHeartbeat(h)
+        audioEngine.play()
+        _previewingBg.value = true
+        bgPreviewJob = viewModelScope.launch {
+            kotlinx.coroutines.delay(5000L)
+            stopBackgroundPreview()
+        }
+    }
+
+    fun stopBackgroundPreview() {
+        bgPreviewJob?.cancel()
+        bgPreviewJob = null
+        if (_previewingBg.value) {
+            audioEngine.stop()
+            _previewingBg.value = false
+        }
+    }
+
+    /** Preview only the voice message. */
+    fun previewVoice() {
+        val list = _voiceRecordings.value
+        if (list.isNotEmpty()) audioEngine.voicePlayer.playOne(list.first())
+    }
+
+    private var fullPreviewWatchJob: Job? = null
+
+    /** Preview the full heartbeat with all layers. Auto-stops when timeline ends. */
+    fun previewFull() {
+        if (_previewingFull.value) { stopFullPreview(); return }
+        stopBackgroundPreview()
+        val h = buildCurrentHeartbeat()
+        audioEngine.setHeartbeat(h)
+        audioEngine.play()
+        _previewingFull.value = true
+        // Watch for auto-stop
+        fullPreviewWatchJob = viewModelScope.launch {
+            val durationMs = h.totalDurationSec * 1000L + 500L
+            kotlinx.coroutines.delay(durationMs)
+            audioEngine.stop()
+            _previewingFull.value = false
+        }
+    }
+
+    fun stopFullPreview() {
+        fullPreviewWatchJob?.cancel()
+        fullPreviewWatchJob = null
+        if (_previewingFull.value) {
+            audioEngine.stop()
+            _previewingFull.value = false
+        }
+    }
+
+    /** Returns error message if heartbeat is not valid, null if OK. */
+    fun validate(): String? {
+        if (_voiceRecordings.value.isEmpty()) return "Please record a voice message first."
+        return null
+    }
+
+    private fun buildCurrentHeartbeat(): Heartbeat {
+        val id = editId ?: "preview"
+        return Heartbeat(
+            id = id,
+            displayName = _name.value.ifBlank { "My Heartbeat" },
+            synthParams = _synthParams.value,
+            timeline = _timeline.value,
+            noiseType = _noiseType.value,
+            noiseVolume = _noiseVolume.value,
+            binauralPreset = _binauralPreset.value,
+            binauralCarrierHz = _binauralCarrierHz.value,
+            binauralBeatHz = _binauralBeatHz.value,
+            binauralVolume = _binauralVolume.value,
+            solfeggioFrequency = _solfeggioFrequency.value,
+            solfeggioVolume = _solfeggioVolume.value,
+            voiceEnabled = true,
+            voiceRecordings = _voiceRecordings.value,
+            voiceIntervalSec = _voiceIntervalSec.value,
+            voiceVolume = _voiceVolume.value,
+        )
+    }
+
     fun save(onDone: (id: String) -> Unit) {
         viewModelScope.launch {
             val id = editId ?: repository.newId()
@@ -191,7 +329,7 @@ class HeartbeatCreatorViewModel(
                 binauralVolume = _binauralVolume.value,
                 solfeggioFrequency = _solfeggioFrequency.value,
                 solfeggioVolume = _solfeggioVolume.value,
-                voiceEnabled = _voiceEnabled.value,
+                voiceEnabled = true,
                 voiceRecordings = _voiceRecordings.value,
                 voiceIntervalSec = _voiceIntervalSec.value,
                 voiceVolume = _voiceVolume.value,

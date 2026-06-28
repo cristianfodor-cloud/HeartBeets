@@ -16,6 +16,9 @@
     <!-- Notification for Android 13+ -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
+    <!-- Microphone for voice recording affirmations -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
     <uses-feature android:name="android.hardware.bluetooth_le" android:required="true" />
 
     <application

@@ -136,19 +136,31 @@ class AudioEngine(private val context: Context) {
         val solVol = if (pack.solfeggioFrequency == SolfeggioFrequency.NONE) 0f else pack.solfeggioVolume
         scheduler.setSolfeggio(pack.solfeggioFrequency.hz, solVol)
         // Configure affirmations
-        val texts = if (pack.affirmationSet == AffirmationSet.CUSTOM) {
-            pack.affirmationCustomTexts
-        } else {
-            pack.affirmationSet.affirmations
+        when (pack.affirmationMode) {
+            AffirmationMode.TTS -> {
+                val texts = if (pack.affirmationSet == AffirmationSet.CUSTOM) {
+                    pack.affirmationCustomTexts
+                } else {
+                    pack.affirmationSet.affirmations
+                }
+                affirmationEngine.configure(
+                    texts = texts,
+                    intervalSec = pack.affirmationIntervalSec,
+                    vol = pack.affirmationVolume,
+                    speechRate = pack.affirmationSpeechRate,
+                    pitch = pack.affirmationPitch,
+                    voiceName = pack.affirmationVoiceName,
+                )
+            }
+            AffirmationMode.RECORDED -> {
+                affirmationEngine.configureRecorded(
+                    filePaths = pack.affirmationRecordings,
+                    intervalSec = pack.affirmationIntervalSec,
+                    vol = pack.affirmationVolume,
+                )
+            }
+            AffirmationMode.NONE -> { /* no affirmations */ }
         }
-        affirmationEngine.configure(
-            texts = texts,
-            intervalSec = pack.affirmationIntervalSec,
-            vol = pack.affirmationVolume,
-            speechRate = pack.affirmationSpeechRate,
-            pitch = pack.affirmationPitch,
-            voiceName = pack.affirmationVoiceName,
-        )
     }
 
     private fun loadPcm(pack: SoundPack): ShortArray {

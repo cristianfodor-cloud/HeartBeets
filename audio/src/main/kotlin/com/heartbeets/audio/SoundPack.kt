@@ -23,7 +23,8 @@ data class SoundPack(
     // Solfeggio tone
     val solfeggioFrequency: SolfeggioFrequency = SolfeggioFrequency.NONE,
     val solfeggioVolume: Float = 0.3f,
-    // Affirmations (TTS)
+    // Affirmations
+    val affirmationMode: AffirmationMode = AffirmationMode.NONE,
     val affirmationSet: AffirmationSet = AffirmationSet.NONE,
     val affirmationCustomTexts: List<String> = emptyList(),
     val affirmationIntervalSec: Int = 30,
@@ -31,4 +32,6 @@ data class SoundPack(
     val affirmationSpeechRate: Float = 0.9f,
     val affirmationPitch: Float = 1.0f,
     val affirmationVoiceName: String? = null,
+    /** File paths for recorded voice messages (used when mode is RECORDED). */
+    val affirmationRecordings: List<String> = emptyList(),
 )

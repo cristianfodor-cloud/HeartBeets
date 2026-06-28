@@ -5,6 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.heartbeets.audio.AffirmationMode
 import com.heartbeets.audio.AffirmationSet
 import com.heartbeets.audio.AudioEngine
 import com.heartbeets.audio.BinauralPreset
@@ -14,6 +15,7 @@ import com.heartbeets.audio.SoundPack
 import com.heartbeets.audio.SoundPackRegistry
 import com.heartbeets.audio.SoundPackRepository
 import com.heartbeets.audio.SynthParams
+import com.heartbeets.audio.VoiceRecorder
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -27,6 +29,7 @@ class SoundDesignerViewModel(
 
     val audioEngine = AudioEngine(application)
     private val repository = SoundPackRepository(application)
+    val voiceRecorder = VoiceRecorder(application)
 
     private val _params = MutableStateFlow(initialParams ?: SynthParams.CLASSIC)
     val params: StateFlow<SynthParams> = _params.asStateFlow()
@@ -65,6 +68,9 @@ class SoundDesignerViewModel(
     val solfeggioVolume: StateFlow<Float> = _solfeggioVolume.asStateFlow()
 
     // Affirmations
+    private val _affirmationMode = MutableStateFlow(AffirmationMode.NONE)
+    val affirmationMode: StateFlow<AffirmationMode> = _affirmationMode.asStateFlow()
+
     private val _affirmationSet = MutableStateFlow(AffirmationSet.NONE)
     val affirmationSet: StateFlow<AffirmationSet> = _affirmationSet.asStateFlow()
 
@@ -86,6 +92,12 @@ class SoundDesignerViewModel(
     private val _affirmationVoiceName = MutableStateFlow<String?>(null)
     val affirmationVoiceName: StateFlow<String?> = _affirmationVoiceName.asStateFlow()
 
+    private val _affirmationRecordings = MutableStateFlow<List<String>>(emptyList())
+    val affirmationRecordings: StateFlow<List<String>> = _affirmationRecordings.asStateFlow()
+
+    private val _isRecording = MutableStateFlow(false)
+    val isRecording: StateFlow<Boolean> = _isRecording.asStateFlow()
+
     /** Available TTS voices as (name, displayLabel) pairs. */
     private val _availableVoices = MutableStateFlow<List<Pair<String, String>>>(emptyList())
     val availableVoices: StateFlow<List<Pair<String, String>>> = _availableVoices.asStateFlow()
@@ -105,8 +117,10 @@ class SoundDesignerViewModel(
                 _binauralVolume.value = pack.binauralVolume
                 _solfeggioFrequency.value = pack.solfeggioFrequency
                 _solfeggioVolume.value = pack.solfeggioVolume
+                _affirmationMode.value = pack.affirmationMode
                 _affirmationSet.value = pack.affirmationSet
                 _affirmationCustomTexts.value = pack.affirmationCustomTexts
+                _affirmationRecordings.value = pack.affirmationRecordings
                 _affirmationIntervalSec.value = pack.affirmationIntervalSec
                 _affirmationVolume.value = pack.affirmationVolume
                 _affirmationSpeechRate.value = pack.affirmationSpeechRate
@@ -217,6 +231,47 @@ class SoundDesignerViewModel(
         _affirmationVoiceName.value = name
     }
 
+    fun updateAffirmationMode(mode: AffirmationMode) {
+        _affirmationMode.value = mode
+    }
+
+    /** Start recording a new voice message at the next available index. */
+    fun startRecording() {
+        val packId = editPackId ?: "new_pack"
+        val index = _affirmationRecordings.value.size
+        val path = voiceRecorder.start(packId, index)
+        if (path != null) {
+            _isRecording.value = true
+        }
+    }
+
+    /** Stop the current recording and add it to the list. */
+    fun stopRecording() {
+        val path = voiceRecorder.stop()
+        _isRecording.value = false
+        if (path != null) {
+            _affirmationRecordings.value = _affirmationRecordings.value + path
+        }
+    }
+
+    /** Delete a recording at the given index. */
+    fun deleteRecording(index: Int) {
+        val recordings = _affirmationRecordings.value.toMutableList()
+        if (index in recordings.indices) {
+            voiceRecorder.deleteRecording(recordings[index])
+            recordings.removeAt(index)
+            _affirmationRecordings.value = recordings
+        }
+    }
+
+    /** Preview a recorded message. */
+    fun previewRecording(index: Int) {
+        val recordings = _affirmationRecordings.value
+        if (index in recordings.indices) {
+            audioEngine.getAffirmationEngine().playRecording(recordings[index])
+        }
+    }
+
     fun previewAffirmation() {
         val texts = if (_affirmationSet.value == AffirmationSet.CUSTOM) {
             _affirmationCustomTexts.value
@@ -257,8 +312,10 @@ class SoundDesignerViewModel(
                 binauralVolume = _binauralVolume.value,
                 solfeggioFrequency = _solfeggioFrequency.value,
                 solfeggioVolume = _solfeggioVolume.value,
+                affirmationMode = _affirmationMode.value,
                 affirmationSet = _affirmationSet.value,
                 affirmationCustomTexts = _affirmationCustomTexts.value,
+                affirmationRecordings = _affirmationRecordings.value,
                 affirmationIntervalSec = _affirmationIntervalSec.value,
                 affirmationVolume = _affirmationVolume.value,
                 affirmationSpeechRate = _affirmationSpeechRate.value,

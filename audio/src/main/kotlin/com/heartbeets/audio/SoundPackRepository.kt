@@ -92,8 +92,10 @@ class SoundPackRepository(context: Context) {
         put("solfeggioFrequency", pack.solfeggioFrequency.name)
         put("solfeggioVolume", pack.solfeggioVolume.toDouble())
         // Affirmations
+        put("affirmationMode", pack.affirmationMode.name)
         put("affirmationSet", pack.affirmationSet.name)
         put("affirmationCustomTexts", JSONArray(pack.affirmationCustomTexts))
+        put("affirmationRecordings", JSONArray(pack.affirmationRecordings))
         put("affirmationIntervalSec", pack.affirmationIntervalSec)
         put("affirmationVolume", pack.affirmationVolume.toDouble())
         put("affirmationSpeechRate", pack.affirmationSpeechRate.toDouble())
@@ -138,15 +140,28 @@ class SoundPackRepository(context: Context) {
             binauralVolume = obj.optDouble("binauralVolume", 0.3).toFloat(),
             solfeggioFrequency = try { SolfeggioFrequency.valueOf(obj.optString("solfeggioFrequency", "NONE")) } catch (_: Exception) { SolfeggioFrequency.NONE },
             solfeggioVolume = obj.optDouble("solfeggioVolume", 0.3).toFloat(),
+            affirmationMode = run {
+                val explicit = obj.optString("affirmationMode", "")
+                if (explicit.isNotEmpty()) {
+                    try { AffirmationMode.valueOf(explicit) } catch (_: Exception) { AffirmationMode.NONE }
+                } else {
+                    // Backward compat: infer TTS mode from old packs that had affirmationSet
+                    val set = obj.optString("affirmationSet", "NONE")
+                    if (set != "NONE") AffirmationMode.TTS else AffirmationMode.NONE
+                }
+            },
             affirmationSet = try { AffirmationSet.valueOf(obj.optString("affirmationSet", "NONE")) } catch (_: Exception) { AffirmationSet.NONE },
             affirmationCustomTexts = obj.optJSONArray("affirmationCustomTexts")?.let { arr ->
+                (0 until arr.length()).map { arr.getString(it) }
+            } ?: emptyList(),
+            affirmationRecordings = obj.optJSONArray("affirmationRecordings")?.let { arr ->
                 (0 until arr.length()).map { arr.getString(it) }
             } ?: emptyList(),
             affirmationIntervalSec = obj.optInt("affirmationIntervalSec", 30),
             affirmationVolume = obj.optDouble("affirmationVolume", 0.8).toFloat(),
             affirmationSpeechRate = obj.optDouble("affirmationSpeechRate", 0.9).toFloat(),
             affirmationPitch = obj.optDouble("affirmationPitch", 1.0).toFloat(),
-            affirmationVoiceName = obj.optString("affirmationVoiceName", null),
+            affirmationVoiceName = obj.optString("affirmationVoiceName").ifEmpty { null },
         )
     }
 }

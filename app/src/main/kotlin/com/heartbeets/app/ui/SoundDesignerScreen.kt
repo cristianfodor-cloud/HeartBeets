@@ -1,5 +1,9 @@
 package com.heartbeets.app.ui
 
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -10,8 +14,11 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.core.content.ContextCompat
+import com.heartbeets.audio.AffirmationMode
 import com.heartbeets.audio.AffirmationSet
 import com.heartbeets.audio.BinauralPreset
 import com.heartbeets.audio.NoiseType
@@ -43,9 +50,27 @@ fun SoundDesignerScreen(
     val affirmationSpeechRate by viewModel.affirmationSpeechRate.collectAsState()
     val affirmationPitch by viewModel.affirmationPitch.collectAsState()
     val affirmationVoiceName by viewModel.affirmationVoiceName.collectAsState()
+    val affirmationMode by viewModel.affirmationMode.collectAsState()
+    val affirmationRecordings by viewModel.affirmationRecordings.collectAsState()
+    val isRecording by viewModel.isRecording.collectAsState()
     val availableVoices by viewModel.availableVoices.collectAsState()
     var customTextInput by remember { mutableStateOf("") }
     var voiceDropdownExpanded by remember { mutableStateOf(false) }
+
+    // Permission handling for RECORD_AUDIO
+    val context = LocalContext.current
+    var hasRecordPermission by remember {
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
+                PackageManager.PERMISSION_GRANTED
+        )
+    }
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        hasRecordPermission = granted
+        if (granted) viewModel.startRecording()
+    }
 
     Scaffold(
         containerColor = androidx.compose.ui.graphics.Color.Transparent,
@@ -291,26 +316,49 @@ fun SoundDesignerScreen(
             // --- Affirmations ---
             SectionHeader("Affirmations")
             Text(
-                "Spoken positive affirmations at regular intervals via text-to-speech.",
+                "Positive messages at regular intervals \u2014 via text-to-speech or your own recorded voice.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(Modifier.height(4.dp))
+            // Mode selector
             androidx.compose.foundation.layout.FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                AffirmationSet.entries.forEach { set ->
-                    FilterChip(
-                        selected = affirmationSet == set,
-                        onClick = { viewModel.updateAffirmationSet(set) },
-                        label = { Text(set.label) },
-                    )
-                }
+                FilterChip(
+                    selected = affirmationMode == AffirmationMode.NONE,
+                    onClick = { viewModel.updateAffirmationMode(AffirmationMode.NONE) },
+                    label = { Text("Off") },
+                )
+                FilterChip(
+                    selected = affirmationMode == AffirmationMode.TTS,
+                    onClick = { viewModel.updateAffirmationMode(AffirmationMode.TTS) },
+                    label = { Text("Text-to-Speech") },
+                )
+                FilterChip(
+                    selected = affirmationMode == AffirmationMode.RECORDED,
+                    onClick = { viewModel.updateAffirmationMode(AffirmationMode.RECORDED) },
+                    label = { Text("Record Voice") },
+                )
             }
-            if (affirmationSet != AffirmationSet.NONE) {
+
+            if (affirmationMode == AffirmationMode.TTS) {
+                // TTS affirmation set chooser
+                Spacer(Modifier.height(8.dp))
+                androidx.compose.foundation.layout.FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    AffirmationSet.entries.filter { it != AffirmationSet.NONE }.forEach { set ->
+                        FilterChip(
+                            selected = affirmationSet == set,
+                            onClick = { viewModel.updateAffirmationSet(set) },
+                            label = { Text(set.label) },
+                        )
+                    }
+                }
                 if (affirmationSet == AffirmationSet.CUSTOM) {
-                    // Custom affirmation text editor
                     OutlinedTextField(
                         value = customTextInput,
                         onValueChange = { customTextInput = it },
@@ -350,14 +398,14 @@ fun SoundDesignerScreen(
                             }
                         }
                     }
-                } else {
-                    // Show first few from the selected set
+                } else if (affirmationSet != AffirmationSet.NONE) {
                     Text(
                         affirmationSet.affirmations.take(3).joinToString(" \u2022 ") + " \u2026",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.primary,
                     )
                 }
+                // TTS settings
                 ParamSliderInt("Interval (sec)", affirmationIntervalSec, 10, 120) {
                     viewModel.updateAffirmationIntervalSec(it)
                 }
@@ -411,6 +459,66 @@ fun SoundDesignerScreen(
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Text("Preview Voice")
+                }
+            }
+
+            if (affirmationMode == AffirmationMode.RECORDED) {
+                // Recorded voice messages
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "Record affirmation messages using your own voice.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(8.dp))
+
+                // List existing recordings
+                affirmationRecordings.forEachIndexed { index, _ ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            "Message ${index + 1}",
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.weight(1f),
+                        )
+                        IconButton(onClick = { viewModel.previewRecording(index) }) {
+                            Icon(Icons.Filled.PlayArrow, contentDescription = "Play")
+                        }
+                        IconButton(onClick = { viewModel.deleteRecording(index) }) {
+                            Text("\u2715", style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                }
+
+                // Record button
+                Spacer(Modifier.height(8.dp))
+                Button(
+                    onClick = {
+                        if (isRecording) {
+                            viewModel.stopRecording()
+                        } else if (hasRecordPermission) {
+                            viewModel.startRecording()
+                        } else {
+                            permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                        }
+                    },
+                    colors = if (isRecording) ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error
+                    ) else ButtonDefaults.buttonColors(),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(if (isRecording) "\u23F9  Stop Recording" else "\u23FA  Record Message")
+                }
+
+                // Shared settings
+                ParamSliderInt("Interval (sec)", affirmationIntervalSec, 10, 120) {
+                    viewModel.updateAffirmationIntervalSec(it)
+                }
+                ParamSlider("Volume", affirmationVolume, 0f, 1f) {
+                    viewModel.updateAffirmationVolume(it)
                 }
             }
 

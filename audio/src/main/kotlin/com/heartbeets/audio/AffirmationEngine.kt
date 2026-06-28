@@ -1,9 +1,11 @@
 package com.heartbeets.audio
 
 import android.content.Context
+import android.media.MediaPlayer
 import android.os.Bundle
 import android.speech.tts.TextToSpeech
 import android.speech.tts.Voice
+import android.util.Log
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -16,12 +18,13 @@ import kotlinx.coroutines.launch
 import java.util.Locale
 
 /**
- * Speaks positive affirmations at regular intervals using the Android TTS engine.
+ * Speaks positive affirmations at regular intervals using the Android TTS engine,
+ * or plays recorded voice messages from files.
  *
- * The TTS audio is played through the system audio mixer alongside the [AudioTrack]
+ * The audio is played through the system audio mixer alongside the [AudioTrack]
  * from [CadenceScheduler], so both are heard simultaneously without PCM-level mixing.
  */
-class AffirmationEngine(context: Context) {
+class AffirmationEngine(private val appContext: Context) {
 
     private var tts: TextToSpeech? = null
 
@@ -31,13 +34,16 @@ class AffirmationEngine(context: Context) {
     private var scope: CoroutineScope? = null
     private var timerJob: Job? = null
 
+    private var mode: AffirmationMode = AffirmationMode.NONE
     private var affirmations: List<String> = emptyList()
+    private var recordings: List<String> = emptyList()
     private var intervalMs: Long = 30_000L
     private var volume: Float = 0.8f
     private var currentIndex: Int = 0
+    private var mediaPlayer: MediaPlayer? = null
 
     init {
-        tts = TextToSpeech(context.applicationContext) { status ->
+        tts = TextToSpeech(appContext) { status ->
             ttsReady = status == TextToSpeech.SUCCESS
             if (ttsReady) {
                 tts?.language = Locale.US
@@ -69,7 +75,9 @@ class AffirmationEngine(context: Context) {
         pitch: Float = 1.0f,
         voiceName: String? = null,
     ) {
+        mode = AffirmationMode.TTS
         affirmations = texts
+        recordings = emptyList()
         intervalMs = intervalSec.coerceAtLeast(10) * 1000L
         volume = vol.coerceIn(0f, 1f)
         currentIndex = 0
@@ -85,18 +93,41 @@ class AffirmationEngine(context: Context) {
     }
 
     /**
+     * Configure the engine for recorded voice message playback.
+     * Call before [start].
+     */
+    fun configureRecorded(
+        filePaths: List<String>,
+        intervalSec: Int,
+        vol: Float,
+    ) {
+        mode = AffirmationMode.RECORDED
+        recordings = filePaths.filter { java.io.File(it).exists() }
+        affirmations = emptyList()
+        intervalMs = intervalSec.coerceAtLeast(10) * 1000L
+        volume = vol.coerceIn(0f, 1f)
+        currentIndex = 0
+    }
+
+    /**
      * Start speaking affirmations at the configured interval.
      * The first affirmation is spoken after one full interval (not immediately).
      */
     fun start() {
-        if (affirmations.isEmpty() || !ttsReady) return
+        if (mode == AffirmationMode.TTS && (affirmations.isEmpty() || !ttsReady)) return
+        if (mode == AffirmationMode.RECORDED && recordings.isEmpty()) return
+        if (mode == AffirmationMode.NONE) return
         stop()
         scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         timerJob = scope?.launch {
             try {
                 delay(intervalMs)
                 while (isActive) {
-                    speakNext()
+                    when (mode) {
+                        AffirmationMode.TTS -> speakNext()
+                        AffirmationMode.RECORDED -> playNextRecording()
+                        AffirmationMode.NONE -> {}
+                    }
                     delay(intervalMs)
                 }
             } catch (_: CancellationException) { /* normal */ }
@@ -104,7 +135,7 @@ class AffirmationEngine(context: Context) {
     }
 
     /**
-     * Stop the affirmation timer and silence any in-progress speech.
+     * Stop the affirmation timer and silence any in-progress speech/playback.
      */
     fun stop() {
         timerJob?.cancel()
@@ -112,6 +143,8 @@ class AffirmationEngine(context: Context) {
         scope?.cancel()
         scope = null
         tts?.stop()
+        mediaPlayer?.release()
+        mediaPlayer = null
     }
 
     /**
@@ -126,7 +159,25 @@ class AffirmationEngine(context: Context) {
     }
 
     /**
-     * Release the TTS engine. Call when no longer needed.
+     * Play a single recorded file immediately (for preview).
+     */
+    fun playRecording(filePath: String) {
+        mediaPlayer?.release()
+        try {
+            mediaPlayer = MediaPlayer().apply {
+                setDataSource(filePath)
+                setVolume(volume, volume)
+                prepare()
+                start()
+                setOnCompletionListener { mp -> mp.release() }
+            }
+        } catch (e: Exception) {
+            Log.e("AffirmationEngine", "Failed to play recording: $filePath", e)
+        }
+    }
+
+    /**
+     * Release the TTS engine and media player. Call when no longer needed.
      */
     fun release() {
         stop()
@@ -145,5 +196,12 @@ class AffirmationEngine(context: Context) {
             putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, volume)
         }
         tts?.speak(text, TextToSpeech.QUEUE_ADD, params, "affirmation_$currentIndex")
+    }
+
+    private fun playNextRecording() {
+        if (recordings.isEmpty()) return
+        val filePath = recordings[currentIndex % recordings.size]
+        currentIndex++
+        playRecording(filePath)
     }
 }

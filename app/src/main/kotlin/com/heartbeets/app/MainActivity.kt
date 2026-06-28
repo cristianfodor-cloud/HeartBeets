@@ -9,6 +9,9 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
@@ -18,6 +21,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.heartbeets.app.ui.AuthManager
 import com.heartbeets.app.ui.HeartBeetsTheme
 import com.heartbeets.app.ui.HeartbeatCreatorScreen
 import com.heartbeets.app.ui.HeartbeatCreatorViewModel
@@ -25,6 +29,7 @@ import com.heartbeets.app.ui.HeartbeatCreatorViewModelFactory
 import com.heartbeets.app.ui.HomeScreen
 import com.heartbeets.app.ui.ListenScreen
 import com.heartbeets.app.ui.MyHeartbeatsScreen
+import com.heartbeets.app.ui.SignInScreen
 
 
 class MainActivity : ComponentActivity() {
@@ -39,6 +44,17 @@ class MainActivity : ComponentActivity() {
                         modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Crop,
                     )
+
+                    val authManager = remember { AuthManager(this@MainActivity) }
+                    val user by authManager.user.collectAsState()
+                    val webClientId = getString(R.string.default_web_client_id)
+
+                    if (user == null) {
+                        SignInScreen(
+                            authManager = authManager,
+                            webClientId = webClientId,
+                        )
+                    } else {
                     val nav = rememberNavController()
 
                 // Handle deep link heartbeets://listen/{code}
@@ -99,6 +115,7 @@ class MainActivity : ComponentActivity() {
                         )
                     }
                 }
+                    } // else (signed in)
                 } // Box
             }
         }

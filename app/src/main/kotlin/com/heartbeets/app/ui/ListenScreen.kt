@@ -71,15 +71,12 @@ class ListenViewModel(application: Application) : AndroidViewModel(application) 
                     _loading.value = false
                     return@launch
                 }
-                android.util.Log.d("ListenVM", "voiceEnabled=${shared.voiceEnabled} voiceUrls=${shared.voiceRecordingUrls.size}")
                 // Download voice files from Storage
                 val localPaths = if (shared.voiceRecordingUrls.isNotEmpty()) {
                     shareService.downloadVoiceFiles(c, shared.voiceRecordingUrls)
                 } else emptyList()
-                android.util.Log.d("ListenVM", "downloaded voice paths=$localPaths")
 
                 val hb = shared.toHeartbeat(localPaths)
-                android.util.Log.d("ListenVM", "heartbeat voiceEnabled=${hb.voiceEnabled} voiceRecordings=${hb.voiceRecordings}")
                 // Save to received heartbeats
                 receivedRepo.save(hb)
                 _receivedHeartbeats.value = receivedRepo.loadAll()

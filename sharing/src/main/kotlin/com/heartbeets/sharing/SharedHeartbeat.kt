@@ -48,7 +48,6 @@ data class SharedHeartbeat(
     // Voice
     val voiceEnabled: Boolean = false,
     val voiceRecordingUrls: List<String> = emptyList(),
-    val voiceRecordingData: List<String> = emptyList(), // base64-encoded voice files
     val voiceIntervalSec: Int = 30,
     val voiceVolume: Double = 0.8,
 ) {

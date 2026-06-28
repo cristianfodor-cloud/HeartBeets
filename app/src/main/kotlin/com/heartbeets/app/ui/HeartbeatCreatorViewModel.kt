@@ -65,8 +65,6 @@ class HeartbeatCreatorViewModel(
     val solfeggioVolume: StateFlow<Float> = _solfeggioVolume.asStateFlow()
 
     // --- Voice ---
-    private val _voiceEnabled = MutableStateFlow(false)
-    val voiceEnabled: StateFlow<Boolean> = _voiceEnabled.asStateFlow()
     private val _voiceRecordings = MutableStateFlow<List<String>>(emptyList())
     val voiceRecordings: StateFlow<List<String>> = _voiceRecordings.asStateFlow()
     private val _voiceIntervalSec = MutableStateFlow(30)
@@ -91,7 +89,6 @@ class HeartbeatCreatorViewModel(
                     _binauralVolume.value = h.binauralVolume
                     _solfeggioFrequency.value = h.solfeggioFrequency
                     _solfeggioVolume.value = h.solfeggioVolume
-                    _voiceEnabled.value = h.voiceEnabled
                     _voiceRecordings.value = h.voiceRecordings
                     _voiceIntervalSec.value = h.voiceIntervalSec
                     _voiceVolume.value = h.voiceVolume

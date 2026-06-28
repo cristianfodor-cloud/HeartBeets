@@ -39,7 +39,6 @@ fun HomeScreen(
     onScanClicked: () -> Unit = {},
     onListenClicked: () -> Unit = {},
     onHeartCodesClicked: () -> Unit = {},
-    onSubscriptionClicked: () -> Unit = {},
     onOfflineModeClicked: () -> Unit = {},
 ) {
     var showInfo by remember { mutableStateOf(false) }
@@ -154,15 +153,6 @@ fun HomeScreen(
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Text("My HeartCodes")
-            }
-
-            Spacer(Modifier.height(8.dp))
-
-            OutlinedButton(
-                onClick = onSubscriptionClicked,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text("Subscription")
             }
 
             Spacer(Modifier.height(24.dp))

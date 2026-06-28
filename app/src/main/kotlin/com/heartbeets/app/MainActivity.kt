@@ -29,8 +29,7 @@ import com.heartbeets.app.ui.ProfileCreatorViewModelFactory
 import com.heartbeets.app.ui.SoundDesignerScreen
 import com.heartbeets.app.ui.SoundDesignerViewModel
 import com.heartbeets.app.ui.SoundDesignerViewModelFactory
-import com.heartbeets.app.ui.SubscriptionScreen
-import com.heartbeets.app.billing.BillingViewModel
+
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -60,7 +59,7 @@ class MainActivity : ComponentActivity() {
                             onScanClicked = { nav.navigate("scan") },
                             onListenClicked = { nav.navigate("listen/none") },
                             onHeartCodesClicked = { nav.navigate("heartcodes") },
-                            onSubscriptionClicked = { nav.navigate("subscription") },
+
                             onOfflineModeClicked = { nav.navigate("live/offline/offline") },
                         )
                     }
@@ -155,9 +154,7 @@ class MainActivity : ComponentActivity() {
                             onBack = { nav.popBackStack() },
                         )
                     }
-                    composable("subscription") {
-                        SubscriptionScreen(onBack = { nav.popBackStack() })
-                    }
+
                 }
                 } // Box
             }

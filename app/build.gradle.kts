@@ -58,7 +58,6 @@ dependencies {
     implementation(libs.firebase.firestore.ktx)
 
     implementation(libs.zxing.core)
-    implementation(libs.billing.ktx)
     implementation(libs.play.services.auth)
 
     debugImplementation(libs.compose.ui.tooling)

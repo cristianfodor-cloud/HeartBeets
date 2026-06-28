@@ -21,9 +21,8 @@ dependencies {
     implementation(project(":audio"))
 
     implementation(platform(libs.firebase.bom))
-    implementation(libs.firebase.database.ktx)
     implementation(libs.firebase.firestore.ktx)
+    implementation(libs.firebase.storage.ktx)
 
     implementation(libs.kotlinx.coroutines.android)
-    implementation(libs.androidx.lifecycle.viewmodel.ktx)
 }

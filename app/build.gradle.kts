@@ -28,16 +28,7 @@ android {
 
 dependencies {
     implementation(project(":core"))
-    implementation(project(":ble"))
-    implementation(project(":data"))
     implementation(project(":audio"))
-    implementation(project(":service"))
-    implementation(project(":driver-veepoo"))
-    implementation(project(":driver-standard-hrs"))
-    implementation(project(":driver-huami"))
-    implementation(project(":driver-colmi"))
-    implementation(project(":driver-huawei"))
-    implementation(project(":driver-galaxy"))
     implementation(project(":sharing"))
 
     implementation(platform(libs.compose.bom))
@@ -53,12 +44,8 @@ dependencies {
     implementation(libs.androidx.core.ktx)
 
     implementation(platform(libs.firebase.bom))
-    implementation(libs.firebase.auth.ktx)
-    implementation(libs.firebase.database.ktx)
     implementation(libs.firebase.firestore.ktx)
-
-    implementation(libs.zxing.core)
-    implementation(libs.play.services.auth)
+    implementation(libs.firebase.storage.ktx)
 
     debugImplementation(libs.compose.ui.tooling)
 }

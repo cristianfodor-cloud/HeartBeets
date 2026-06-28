@@ -36,10 +36,9 @@ import androidx.compose.ui.unit.dp
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
-    onScanClicked: () -> Unit = {},
+    onCreateClicked: () -> Unit = {},
     onListenClicked: () -> Unit = {},
-    onHeartCodesClicked: () -> Unit = {},
-    onOfflineModeClicked: () -> Unit = {},
+    onMyHeartbeatClicked: () -> Unit = {},
 ) {
     var showInfo by remember { mutableStateOf(false) }
     val context = LocalContext.current
@@ -47,45 +46,33 @@ fun HomeScreen(
     if (showInfo) {
         AlertDialog(
             onDismissRequest = { showInfo = false },
-            title = { Text("HeartBeets Guide") },
+            title = { Text("HeartBeets") },
             text = {
                 Column(Modifier.verticalScroll(rememberScrollState())) {
-                    Text("How to use the app", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+                    Text("How it works", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
                     Spacer(Modifier.height(8.dp))
 
-                    Text("Scan for devices", fontWeight = FontWeight.SemiBold)
-                    Text("Connect a Bluetooth heart rate monitor to hear your live heartbeat in real time.")
+                    Text("Create My Heartbeat", fontWeight = FontWeight.SemiBold)
+                    Text("Craft a unique heartbeat with your own BPM timeline, binaural beats, solfeggio frequencies, background noise, and voice messages recorded in your own voice.")
                     Spacer(Modifier.height(8.dp))
 
-                    Text("Offline Mode", fontWeight = FontWeight.SemiBold)
-                    Text("Listen to any BPM with any sound pack — no device needed. Great for meditation or relaxation at a fixed rhythm.")
+                    Text("Share", fontWeight = FontWeight.SemiBold)
+                    Text("Each heartbeat gets a code. Share it with anyone — they enter the code and your heartbeat plays on their phone.")
                     Spacer(Modifier.height(8.dp))
 
-                    Text("Listen to a Heartbeat", fontWeight = FontWeight.SemiBold)
-                    Text("Enter a HeartCode shared by someone else to listen to their heartbeat remotely.")
-                    Spacer(Modifier.height(8.dp))
-
-                    Text("My HeartCodes", fontWeight = FontWeight.SemiBold)
-                    Text("Create and share your own HeartCode so others can listen to your heartbeat in real time.")
-                    Spacer(Modifier.height(8.dp))
-
-                    Text("Sound Packs", fontWeight = FontWeight.SemiBold)
-                    Text("Choose from built-in packs (classic, ambient, binaural, solfeggio) or create your own with custom noise, binaural beats, and solfeggio frequencies.")
-                    Spacer(Modifier.height(8.dp))
-
-                    Text("Profiles", fontWeight = FontWeight.SemiBold)
-                    Text("Set up cadence profiles that smoothly vary BPM over time — perfect for workouts, breathing exercises, or sleep wind-downs.")
+                    Text("Listen", fontWeight = FontWeight.SemiBold)
+                    Text("Enter someone's code to download and listen to their heartbeat — including their voice messages.")
                     Spacer(Modifier.height(16.dp))
 
                     Text("Contact & Support", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
                     Spacer(Modifier.height(8.dp))
-                    Text("Have a question or feedback? We'd love to hear from you.")
+                    Text("Have a question or feedback?")
                     Spacer(Modifier.height(4.dp))
                     TextButton(
                         onClick = {
                             val intent = Intent(Intent.ACTION_SENDTO).apply {
                                 data = Uri.parse("mailto:contact@dogplanet.app")
-                                putExtra(Intent.EXTRA_SUBJECT, "HeartBeets Support")
+                                putExtra(Intent.EXTRA_SUBJECT, "HeartBeets Feedback")
                             }
                             context.startActivity(intent)
                         }
@@ -122,37 +109,28 @@ fun HomeScreen(
             Spacer(Modifier.weight(1f))
 
             Button(
-                onClick = onScanClicked,
+                onClick = onCreateClicked,
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Text("Scan for devices")
+                Text("Create My Heartbeat")
             }
 
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(12.dp))
 
             OutlinedButton(
-                onClick = onOfflineModeClicked,
+                onClick = onMyHeartbeatClicked,
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Text("Offline Mode")
+                Text("My Heartbeats")
             }
 
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(12.dp))
 
             OutlinedButton(
                 onClick = onListenClicked,
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Text("Listen to a Heartbeat")
-            }
-
-            Spacer(Modifier.height(8.dp))
-
-            OutlinedButton(
-                onClick = onHeartCodesClicked,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text("My HeartCodes")
             }
 
             Spacer(Modifier.height(24.dp))

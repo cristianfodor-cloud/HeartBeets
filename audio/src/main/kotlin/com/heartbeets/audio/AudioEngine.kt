@@ -12,7 +12,6 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -21,37 +20,25 @@ import kotlinx.coroutines.launch
 /**
  * Top-level API for heartbeat audio playback.
  *
- * Modes:
- * - **Mirror**: cadence follows the user's live BPM.
- * - **Profile**: cadence follows a [HeartbeatProfile] curve, independent of live BPM.
- *
- * The engine is decoupled from the sound: [setSoundPack] controls *what* plays,
- * while the mode controls *when* it plays.
+ * Plays a [Heartbeat] configuration: the synth sound follows the BPM timeline,
+ * background layers (binaural, solfeggio, noise) play continuously,
+ * and voice messages play at intervals.
  */
 class AudioEngine(private val context: Context) {
 
     private val scheduler = CadenceScheduler()
-    private val affirmationEngine = AffirmationEngine(context)
-    private val _mode = MutableStateFlow(PlaybackMode.STOPPED)
-    val mode: StateFlow<PlaybackMode> = _mode.asStateFlow()
+    val voicePlayer = VoiceMessagePlayer()
+
+    private val _playing = MutableStateFlow(false)
+    val playing: StateFlow<Boolean> = _playing.asStateFlow()
 
     private val _currentBpm = MutableStateFlow(0)
-    /** The cadence currently being played (may differ from live BPM in profile mode). */
-    val currentCadence: StateFlow<Int> = _currentBpm.asStateFlow()
+    val currentBpm: StateFlow<Int> = _currentBpm.asStateFlow()
 
-    /** Last raw BPM received from the wearable (before offset). */
-    private var lastRawBpm: Int = 0
+    private val _elapsedSec = MutableStateFlow(0)
+    val elapsedSec: StateFlow<Int> = _elapsedSec.asStateFlow()
 
-    /** User-applied BPM offset (added to wearable reading). */
-    private val _bpmOffset = MutableStateFlow(0)
-    val bpmOffset: StateFlow<Int> = _bpmOffset.asStateFlow()
-
-    /** Accumulated phase offset in milliseconds. */
-    private val _phaseOffsetMs = MutableStateFlow(0)
-    val phaseOffsetMs: StateFlow<Int> = _phaseOffsetMs.asStateFlow()
-
-    private var mirrorJob: Job? = null
-    private var profileJob: Job? = null
+    private var timelineJob: Job? = null
     private val exceptionHandler = CoroutineExceptionHandler { _, throwable ->
         if (throwable !is CancellationException) {
             android.util.Log.w("AudioEngine", "Coroutine error", throwable)
@@ -59,117 +46,112 @@ class AudioEngine(private val context: Context) {
     }
     private var scope = CoroutineScope(SupervisorJob() + Dispatchers.Default + exceptionHandler)
 
-    private var activePack: SoundPack? = null
-    private var profileInterpolator: ProfileInterpolator? = null
-
-    // --- Adjustments ---
+    private var activeHeartbeat: Heartbeat? = null
 
     /**
-     * Shift the phase of the heartbeat by [deltaMs]. Positive = delay beat,
-     * negative = advance beat. Each call accumulates.
+     * Configure the engine for a [Heartbeat]. Call before [play].
      */
-    fun adjustPhase(deltaMs: Int) {
-        scheduler.adjustPhase(deltaMs)
-        _phaseOffsetMs.value = scheduler.getPhaseOffsetMs()
-    }
-
-    /**
-     * Adjust the BPM offset applied on top of the wearable reading.
-     * Positive = faster, negative = slower.
-     * Immediately updates the scheduler so the change is heard on the next beat.
-     */
-    fun adjustBpmOffset(delta: Int) {
-        _bpmOffset.value = (_bpmOffset.value + delta).coerceIn(-60, 60)
-        applyBpmImmediately()
-    }
-
-    /** Reset both phase and BPM offsets to zero. */
-    fun resetAdjustments() {
-        scheduler.resetPhase()
-        _phaseOffsetMs.value = 0
-        _bpmOffset.value = 0
-        applyBpmImmediately()
-    }
-
-    private fun applyBpmImmediately() {
-        when (_mode.value) {
-            PlaybackMode.MIRROR -> {
-                if (lastRawBpm > 0) {
-                    val adjusted = (lastRawBpm + _bpmOffset.value).coerceIn(1, 220)
-                    scheduler.updateBpm(adjusted)
-                    _currentBpm.value = adjusted
-                }
-            }
-            PlaybackMode.PROFILE -> {
-                val interpolator = profileInterpolator ?: return
-                val cadence = (interpolator.cadenceAt(System.currentTimeMillis()) + _bpmOffset.value).coerceIn(1, 220)
-                scheduler.updateBpm(cadence)
-                _currentBpm.value = cadence
-            }
-            else -> {}
-        }
-    }
-
-    /**
-     * Load a sound pack. The PCM sample is synthesized or decoded and held in memory.
-     * Takes effect on the next beat if playback is active.
-     */
-    fun setSoundPack(pack: SoundPack) {
-        activePack = pack
-        val pcm = loadPcm(pack)
+    fun setHeartbeat(heartbeat: Heartbeat) {
+        activeHeartbeat = heartbeat
+        val pcm = HeartbeatSynthesizer.synthesize(heartbeat.synthParams)
         scheduler.setSample(pcm)
-        // Configure background layers from pack settings
-        scheduler.setNoise(pack.noiseType, pack.noiseVolume)
-        val carrierHz = if (pack.binauralPreset == BinauralPreset.CUSTOM) {
-            pack.binauralCarrierHz
-        } else {
-            pack.binauralPreset.carrierHz
-        }
-        val beatHz = if (pack.binauralPreset == BinauralPreset.CUSTOM) {
-            pack.binauralBeatHz
-        } else {
-            pack.binauralPreset.beatHz
-        }
-        val binVol = if (pack.binauralPreset == BinauralPreset.NONE) 0f else pack.binauralVolume
-        scheduler.setBinaural(carrierHz, beatHz, binVol)
-        // Configure solfeggio tone
-        val solVol = if (pack.solfeggioFrequency == SolfeggioFrequency.NONE) 0f else pack.solfeggioVolume
-        scheduler.setSolfeggio(pack.solfeggioFrequency.hz, solVol)
-        // Configure affirmations
-        when (pack.affirmationMode) {
-            AffirmationMode.TTS -> {
-                val texts = if (pack.affirmationSet == AffirmationSet.CUSTOM) {
-                    pack.affirmationCustomTexts
-                } else {
-                    pack.affirmationSet.affirmations
-                }
-                affirmationEngine.configure(
-                    texts = texts,
-                    intervalSec = pack.affirmationIntervalSec,
-                    vol = pack.affirmationVolume,
-                    speechRate = pack.affirmationSpeechRate,
-                    pitch = pack.affirmationPitch,
-                    voiceName = pack.affirmationVoiceName,
-                )
-            }
-            AffirmationMode.RECORDED -> {
-                affirmationEngine.configureRecorded(
-                    filePaths = pack.affirmationRecordings,
-                    intervalSec = pack.affirmationIntervalSec,
-                    vol = pack.affirmationVolume,
-                )
-            }
-            AffirmationMode.NONE -> { /* no affirmations */ }
-        }
-    }
 
-    private fun loadPcm(pack: SoundPack): ShortArray {
-        return HeartbeatSynthesizer.synthesize(pack.synthParams ?: SynthParams.CLASSIC)
+        // Background layers
+        scheduler.setNoise(heartbeat.noiseType, heartbeat.noiseVolume)
+        val carrierHz = if (heartbeat.binauralPreset == BinauralPreset.CUSTOM) {
+            heartbeat.binauralCarrierHz
+        } else {
+            heartbeat.binauralPreset.carrierHz
+        }
+        val beatHz = if (heartbeat.binauralPreset == BinauralPreset.CUSTOM) {
+            heartbeat.binauralBeatHz
+        } else {
+            heartbeat.binauralPreset.beatHz
+        }
+        val binVol = if (heartbeat.binauralPreset == BinauralPreset.NONE) 0f else heartbeat.binauralVolume
+        scheduler.setBinaural(carrierHz, beatHz, binVol)
+
+        val solVol = if (heartbeat.solfeggioFrequency == SolfeggioFrequency.NONE) 0f else heartbeat.solfeggioVolume
+        scheduler.setSolfeggio(heartbeat.solfeggioFrequency.hz, solVol)
+
+        // Voice messages
+        if (heartbeat.voiceEnabled && heartbeat.voiceRecordings.isNotEmpty()) {
+            voicePlayer.configure(
+                filePaths = heartbeat.voiceRecordings,
+                intervalSec = heartbeat.voiceIntervalSec,
+                vol = heartbeat.voiceVolume,
+            )
+        }
     }
 
     /**
-     * Load a sound directly from [SynthParams] without a SoundPack wrapper.
-     * Useful for live preview in the sound designer.
+     * Start playback following the heartbeat's BPM timeline.
+     */
+    fun play() {
+        val heartbeat = activeHeartbeat ?: return
+        stop()
+        _playing.value = true
+
+        // Start at initial BPM
+        val startBpm = heartbeat.timeline.firstOrNull()?.bpmStart ?: 65
+        scheduler.updateBpm(startBpm)
+        _currentBpm.value = startBpm
+        scheduler.start()
+
+        // Start voice messages
+        if (heartbeat.voiceEnabled && heartbeat.voiceRecordings.isNotEmpty()) {
+            voicePlayer.start()
+        }
+
+        // Follow the timeline
+        timelineJob = scope.launch {
+            val startTime = System.currentTimeMillis()
+            try {
+                while (true) {
+                    val elapsed = System.currentTimeMillis() - startTime
+                    val elapsedSec = (elapsed / 1000).toInt()
+                    _elapsedSec.value = elapsedSec
+
+                    val bpm = computeBpmAtTime(heartbeat.timeline, elapsed)
+                    scheduler.updateBpm(bpm)
+                    _currentBpm.value = bpm
+
+                    // Check if timeline is complete
+                    if (elapsedSec >= heartbeat.totalDurationSec) {
+                        // Hold at final BPM indefinitely until stopped
+                        break
+                    }
+                    delay(200)
+                }
+                // Hold phase — keep playing at final BPM
+                while (true) {
+                    _elapsedSec.value = ((System.currentTimeMillis() - startTime) / 1000).toInt()
+                    delay(1000)
+                }
+            } catch (_: CancellationException) { /* normal */ }
+        }
+    }
+
+    /** Stop playback. */
+    fun stop() {
+        timelineJob?.cancel()
+        timelineJob = null
+        scheduler.stop()
+        voicePlayer.stop()
+        _playing.value = false
+        _currentBpm.value = 0
+        _elapsedSec.value = 0
+    }
+
+    /** Release all resources. */
+    fun release() {
+        stop()
+        voicePlayer.release()
+        scope.cancel()
+    }
+
+    /**
+     * Load synth params directly for preview (no timeline/layers).
      */
     fun setSynthParams(params: SynthParams) {
         val pcm = HeartbeatSynthesizer.synthesize(params)
@@ -177,52 +159,9 @@ class AudioEngine(private val context: Context) {
     }
 
     /**
-     * Play the heartbeat sound once (for preview / testing).
-     * Writes the PCM sample directly to a one-shot AudioTrack — no looping.
+     * Play a single heartbeat for preview.
      */
-    fun playBeatOnce() {
-        val pack = activePack ?: SoundPack(
-            id = "_default", displayName = "", description = "",
-            synthParams = SynthParams.CLASSIC
-        )
-        val pcm = loadPcm(pack)
-        scope.launch(Dispatchers.Default) {
-            val track = AudioTrack.Builder()
-                .setAudioAttributes(
-                    AudioAttributes.Builder()
-                        .setUsage(AudioAttributes.USAGE_MEDIA)
-                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                        .build()
-                )
-                .setAudioFormat(
-                    AudioFormat.Builder()
-                        .setSampleRate(44100)
-                        .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
-                        .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
-                        .build()
-                )
-                .setBufferSizeInBytes(pcm.size * 2)
-                .setTransferMode(AudioTrack.MODE_STATIC)
-                .build()
-            try {
-                track.write(pcm, 0, pcm.size)
-                track.play()
-                val durationMs = (pcm.size * 1000L) / 44100
-                delay(durationMs + 50)
-            } catch (_: CancellationException) {
-                // Normal — user navigated away
-            } finally {
-                try { track.stop() } catch (_: IllegalStateException) {}
-                track.release()
-            }
-        }
-    }
-
-    /**
-     * Synthesize and play a one-shot preview from [SynthParams].
-     * Used by the sound designer for instant feedback.
-     */
-    fun previewSynthParams(params: SynthParams) {
+    fun previewBeat(params: SynthParams = activeHeartbeat?.synthParams ?: SynthParams.CLASSIC) {
         val pcm = HeartbeatSynthesizer.synthesize(params)
         scope.launch(Dispatchers.Default) {
             val track = AudioTrack.Builder()
@@ -247,154 +186,34 @@ class AudioEngine(private val context: Context) {
                 track.play()
                 val durationMs = (pcm.size * 1000L) / 44100
                 delay(durationMs + 50)
-            } catch (_: CancellationException) {
-                // Normal — user navigated away
-            } finally {
+            } catch (_: CancellationException) { }
+            finally {
                 try { track.stop() } catch (_: IllegalStateException) {}
                 track.release()
             }
         }
     }
 
-    /**
-     * Play a one-shot preview of a [SoundPack].
-     * Handles both synthesized and resource-based packs.
-     */
-    fun previewPack(pack: SoundPack) {
-        val pcm = loadPcm(pack)
-        scope.launch(Dispatchers.Default) {
-            val track = AudioTrack.Builder()
-                .setAudioAttributes(
-                    AudioAttributes.Builder()
-                        .setUsage(AudioAttributes.USAGE_MEDIA)
-                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                        .build()
-                )
-                .setAudioFormat(
-                    AudioFormat.Builder()
-                        .setSampleRate(44100)
-                        .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
-                        .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
-                        .build()
-                )
-                .setBufferSizeInBytes(pcm.size * 2)
-                .setTransferMode(AudioTrack.MODE_STATIC)
-                .build()
-            try {
-                track.write(pcm, 0, pcm.size)
-                track.play()
-                val durationMs = (pcm.size * 1000L) / 44100
-                delay(durationMs + 50)
-            } catch (_: CancellationException) {
-                // Normal — user navigated away
-            } finally {
-                try { track.stop() } catch (_: IllegalStateException) {}
-                track.release()
+    private fun computeBpmAtTime(timeline: List<TimelineSegment>, elapsedMs: Long): Int {
+        var accumulatedMs = 0L
+        for (seg in timeline) {
+            val segDurationMs = seg.durationSec * 1000L
+            if (elapsedMs < accumulatedMs + segDurationMs) {
+                // We're in this segment
+                val progress = ((elapsedMs - accumulatedMs).toFloat() / segDurationMs).coerceIn(0f, 1f)
+                val easedProgress = applyEasing(progress, seg.easing)
+                return (seg.bpmStart + (seg.bpmEnd - seg.bpmStart) * easedProgress).toInt()
             }
+            accumulatedMs += segDurationMs
         }
+        // Past all segments — hold at final BPM
+        return timeline.lastOrNull()?.bpmEnd ?: 65
     }
 
-    /**
-     * Start mirror mode: cadence follows the provided BPM flow 1:1,
-     * plus any user-applied BPM offset.
-     * Playback begins only when the first real BPM value arrives.
-     */
-    fun startMirrorMode(bpmFlow: Flow<Int>) {
-        stopPlayback()
-        if (activePack == null) {
-            setSoundPack(SoundPackRegistry.getDefault())
-        }
-        _mode.value = PlaybackMode.MIRROR
-
-        mirrorJob = scope.launch {
-            try {
-                var started = false
-                bpmFlow.collect { bpm ->
-                    if (bpm > 0) {
-                        lastRawBpm = bpm
-                        val adjusted = (bpm + _bpmOffset.value).coerceIn(1, 220)
-                        scheduler.updateBpm(adjusted)
-                        _currentBpm.value = adjusted
-                        if (!started) {
-                            scheduler.start()
-                            affirmationEngine.start()
-                            started = true
-                        }
-                    }
-                }
-            } catch (_: CancellationException) { /* normal shutdown */ }
-        }
+    private fun applyEasing(t: Float, easing: EasingCurve): Float = when (easing) {
+        EasingCurve.LINEAR -> t
+        EasingCurve.EASE_IN -> t * t
+        EasingCurve.EASE_OUT -> 1f - (1f - t) * (1f - t)
+        EasingCurve.EASE_IN_OUT -> if (t < 0.5f) 2f * t * t else 1f - (-2f * t + 2f).let { it * it } / 2f
     }
-
-    /**
-     * Start profile mode: cadence follows the profile's curve.
-     * In RELATIVE mode, anchored at [currentBpm] as the starting point.
-     * In ABSOLUTE mode, starts at the profile's startBpm regardless of live HR.
-     */
-    fun startProfile(profile: HeartbeatProfile, currentBpm: Int) {
-        stopPlayback()
-        if (activePack == null) {
-            setSoundPack(SoundPackRegistry.getDefault())
-        }
-
-        val anchorBpm = when (profile.anchorMode) {
-            ProfileAnchorMode.RELATIVE -> currentBpm
-            ProfileAnchorMode.ABSOLUTE -> profile.startBpm ?: currentBpm
-        }
-
-        val interpolator = ProfileInterpolator(
-            profile = profile,
-            anchorBpm = anchorBpm
-        )
-        profileInterpolator = interpolator
-        _mode.value = PlaybackMode.PROFILE
-        val startCadence = (interpolator.cadenceAt(System.currentTimeMillis()) + _bpmOffset.value).coerceIn(1, 220)
-        scheduler.updateBpm(startCadence)
-        _currentBpm.value = startCadence
-        scheduler.start()
-        affirmationEngine.start()
-
-        profileJob = scope.launch {
-            try {
-                while (true) {
-                    val cadence = (interpolator.cadenceAt(System.currentTimeMillis()) + _bpmOffset.value).coerceIn(1, 220)
-                    scheduler.updateBpm(cadence)
-                    _currentBpm.value = cadence
-
-                    if (interpolator.isFinished(System.currentTimeMillis())) {
-                        // Hold at final cadence — stay in PROFILE mode but stop updating
-                        break
-                    }
-                    delay(200) // update cadence ~5 times per second
-                }
-            } catch (_: CancellationException) { /* normal shutdown */ }
-        }
-    }
-
-    /**
-     * Stop all playback and return to STOPPED mode.
-     */
-    fun stopPlayback() {
-        mirrorJob?.cancel()
-        mirrorJob = null
-        profileJob?.cancel()
-        profileJob = null
-        profileInterpolator = null
-        scheduler.stop()
-        affirmationEngine.stop()
-        _mode.value = PlaybackMode.STOPPED
-        _currentBpm.value = 0
-    }
-
-    /**
-     * Release all resources. Call when the engine is no longer needed.
-     */
-    fun release() {
-        stopPlayback()
-        affirmationEngine.release()
-        scope.cancel()
-    }
-
-    /** Expose the affirmation engine for voice listing and preview in the UI. */
-    fun getAffirmationEngine(): AffirmationEngine = affirmationEngine
 }
